@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+logs/
+runs/
+wandb/
+*.pt
+*.pth
+*.ckpt
