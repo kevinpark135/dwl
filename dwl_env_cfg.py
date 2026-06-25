@@ -105,7 +105,7 @@ class G1Rewards(RewardsCfg):
 
 
 @configclass
-class G1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
+class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
     rewards: G1Rewards = G1Rewards()
 
     def __post_init__(self):
@@ -150,7 +150,7 @@ class G1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
 
 @configclass
-class G1RoughEnvCfg_PLAY(G1RoughEnvCfg):
+class G1DwlEnvCfg_PLAY(G1DwlEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()

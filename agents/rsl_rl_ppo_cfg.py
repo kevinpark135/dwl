@@ -11,7 +11,7 @@ from isaaclab_tasks.utils import preset
 
 
 @configclass
-class G1RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
+class G1DwlPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     # Newton needs ~1.7x the PPO iterations to match PhysX on G1. PhysX saturates near iter 3000
     # (reward ≈ +18, ep_len ≈ 980) and does not meaningfully improve on either metric past that —
@@ -21,7 +21,7 @@ class G1RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     # ceiling — no physics or reward tuning closes it.
     max_iterations = preset(default=3000, newton=5000)
     save_interval = 50
-    experiment_name = "g1_rough"
+    experiment_name = "g1_dwl"
     actor = RslRlMLPModelCfg(
         hidden_dims=[512, 256, 128],
         activation="elu",
@@ -47,14 +47,3 @@ class G1RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         desired_kl=0.01,
         max_grad_norm=1.0,
     )
-
-
-@configclass
-class G1FlatPPORunnerCfg(G1RoughPPORunnerCfg):
-    def __post_init__(self):
-        super().__post_init__()
-
-        self.max_iterations = 1500
-        self.experiment_name = "g1_flat"
-        self.actor.hidden_dims = [256, 128, 128]
-        self.critic.hidden_dims = [256, 128, 128]
