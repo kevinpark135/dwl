@@ -27,6 +27,8 @@ dwl/
 │   ├── dwl_model.py
 │   ├── dwl_ppo.py
 │   └── dwl_runner.py
+├── tests/
+│   └── test_gait.py
 ├── README.md
 └── .gitignore
 ```
@@ -45,11 +47,32 @@ dwl/
 - `rsl_rl/dwl_model.py`: Placeholder for the GRU encoder, latent decoder, actor, and critic modules.
 - `rsl_rl/dwl_ppo.py`: Placeholder for PPO with DWL denoising and latent regularization losses.
 - `rsl_rl/dwl_runner.py`: Placeholder for the runner that wires Isaac Lab observation groups into the DWL training loop.
+- `tests/test_gait.py`: Regression tests for gait phase wrapping, clock inputs, stance masks, and quintic foot references.
 - `.gitignore`: Keeps local caches, logs, checkpoints, and `DWL.pdf` out of git.
+
+## `gait.py`
+
+`gait.py` contains the shared periodic gait utilities used by DWL observations and rewards. It translates the gait-related parts of the paper into pure torch helpers:
+
+- `DwlGaitCfg`: Stores gait timing, phase offset, and the Appendix Table IV quintic coefficients.
+- `gait_phase`: Converts simulation time into normalized cycle phase in `[0, 1)`.
+- `clock_input`: Produces the policy/state clock input `[sin(phase), cos(phase)]`.
+- `stance_mask`: Produces the periodic stance mask `[left, right]`, where `1` means stance/contact and `0` means swing.
+- `swing_elapsed_time`: Computes each foot's elapsed time inside its current swing phase.
+- `quintic_height`, `quintic_velocity`, `quintic_acceleration`: Evaluate the Appendix Table IV swing-foot trajectory and derivatives.
+- `foot_height_reference`, `foot_velocity_reference`, `foot_acceleration_reference`: Return left/right vertical swing-foot references while zeroing the stance foot.
+
+The file is intentionally independent from Isaac Lab manager APIs. The expected connections are:
+
+- `observations.py` will call `clock_input`, `gait_phase`, and `stance_mask` to expose clock, cycle time, and periodic stance mask terms.
+- `rewards.py` will call `stance_mask` for periodic force/velocity rewards and the foot reference helpers for foot height/velocity tracking.
+- `dwl_env_cfg.py` will configure the observation and reward terms that use these helpers.
+- `rsl_rl/dwl_model.py` will indirectly receive these signals through the policy and privileged/state observation groups.
+- `tests/test_gait.py` keeps the gait conventions stable while observations and rewards are implemented.
 
 ## Implementation Order
 
-1. Implement `gait.py` clock signals, stance masks, and quintic foot trajectory helpers.
+1. Implement `gait.py` clock signals, stance masks, and quintic foot trajectory helpers. Basic utilities and tests are now in place.
 2. Implement `observations.py` with separate policy and privileged/state observation terms.
 3. Implement `rewards.py` using the DWL paper reward table and the gait helpers.
 4. Implement `events.py` domain randomization for noise, friction, mass/payload, motor, PD, push, and delay effects.
