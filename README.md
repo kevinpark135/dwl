@@ -29,6 +29,8 @@ dwl/
 │   └── dwl_runner.py
 ├── tests/
 │   ├── test_gait.py
+│   ├── test_events.py
+│   ├── test_env_cfg.py
 │   ├── test_observations.py
 │   └── test_rewards.py
 ├── README.md
@@ -41,7 +43,7 @@ dwl/
 - `dwl_env_cfg.py`: Defines the G1 DWL environment configuration by adapting the Isaac Lab rough locomotion base cfg.
 - `observations.py`: Defines policy observations and privileged/state observations used by DWL.
 - `rewards.py`: Defines paper-specific reward terms such as velocity tracking, periodic gait rewards, foot tracking, and regularization.
-- `events.py`: Placeholder for DWL domain randomization and perturbation events.
+- `events.py`: Defines DWL domain randomization buffers, implemented event helpers, and explicit stubs for actuator/delay integrations.
 - `gait.py`: Defines gait phase, stance masks, clock inputs, and quintic foot trajectory references.
 - `agents/__init__.py`: Marks the agent configuration package.
 - `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration and will later point to the DWL custom model/algorithm/runner.
@@ -50,6 +52,8 @@ dwl/
 - `rsl_rl/dwl_ppo.py`: Placeholder for PPO with DWL denoising and latent regularization losses.
 - `rsl_rl/dwl_runner.py`: Placeholder for the runner that wires Isaac Lab observation groups into the DWL training loop.
 - `tests/test_gait.py`: Regression tests for gait phase wrapping, clock inputs, stance masks, and quintic foot references.
+- `tests/test_events.py`: Regression tests for DWL event buffers, friction storage, push wrenches, mass randomization, and joint reset noise.
+- `tests/test_env_cfg.py`: Regression tests for wiring observations, rewards, events, and action joints into `dwl_env_cfg.py`.
 - `tests/test_observations.py`: Regression tests for DWL observation helper conventions such as quaternion-to-RPY orientation.
 - `tests/test_rewards.py`: Regression tests for DWL reward kernels, phase-aware rewards, foot tracking, and regularization terms.
 - `.gitignore`: Keeps local caches, logs, checkpoints, and `DWL.pdf` out of git.
@@ -135,17 +139,45 @@ The DWL default direction is to keep `base_lin_vel` and `height_scan` out of the
 
 The gait helpers matter here because four rewards are phase-aware: `periodic_force`, `periodic_velocity`, `foot_height_tracking`, and `foot_velocity_tracking`. They must use the same clock, stance mask, and foot trajectory reference as the observations; otherwise the policy could observe one gait phase while rewards score another.
 
+## `events.py`
+
+`events.py` maps the DWL paper domain-randomization table into named Isaac Lab event hooks and privileged buffers.
+
+Implemented helpers:
+
+- `init_dwl_event_buffers`: Creates buffers consumed by privileged observations.
+- `clear_push_force_torques`: Clears the stored external wrench buffer.
+- `sample_push_force_torques`: Samples external force/torque, applies it to the robot, and stores a 6D privileged value.
+- `store_friction`: Samples/stores per-env friction values for `state_friction`.
+- `randomize_body_mass`: Adds bounded payload mass offsets to selected bodies.
+- `randomize_joint_reset_noise`: Applies additive joint position/velocity reset noise.
+
+Explicit stubs:
+
+- `randomize_joint_position_observation_noise`
+- `randomize_joint_velocity_observation_noise`
+- `randomize_angular_velocity_observation_noise`
+- `randomize_orientation_observation_noise`
+- `randomize_system_delay`
+- `randomize_motor_offset`
+- `randomize_motor_strength`
+- `randomize_pd_factors`
+
+The stubs are intentionally named after the paper terms but left unconnected because they require observation noise config, action delay buffers, or actuator-specific APIs.
+
 ## Implemented
 
 - `gait.py`: Clock signals, stance masks, phase offsets, and quintic foot trajectory helpers.
 - `observations.py`: Policy and privileged/state observation term functions.
 - `rewards.py`: DWL paper reward table terms using the shared gait helpers.
+- `events.py`: Initial DWL DR buffers and directly implementable event helpers.
+- `dwl_env_cfg.py`: Wires DWL observations, rewards, event helpers, observation noise, and 12-DoF leg actions into the G1 task.
 - `tests/`: Regression tests for gait, observation, and reward conventions.
 
 ## Remaining Implementation Order
 
-1. Implement `events.py` domain randomization for noise, friction, mass/payload, motor, PD, push, and delay effects.
-2. Wire the new observation, reward, and event terms into `dwl_env_cfg.py`.
+1. Implement actuator/action-delay integrations for motor offset, motor strength, PD factors, and system delay.
+2. Implement any remaining observation-noise refinements beyond the current policy term noise config.
 3. Implement `rsl_rl/dwl_model.py` with the encoder, decoder, actor, and critic.
 4. Implement `rsl_rl/dwl_ppo.py` by adding reconstruction and latent L1 losses to PPO.
 5. Implement `rsl_rl/dwl_runner.py` to pass privileged reconstruction targets through rollout and training.
