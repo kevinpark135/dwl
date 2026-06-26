@@ -26,7 +26,7 @@ import torch
 DEFAULT_QUINTIC_COEFFS = (0.0, 0.1, 5.0, -18.8, 12.0, 9.6)
 
 
-@dataclass(frozen=True)
+@dataclass
 class DwlGaitCfg:
     """Configuration for the periodic gait reference.
 

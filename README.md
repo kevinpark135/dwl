@@ -48,6 +48,7 @@ dwl/
 - `rsl_rl/dwl_ppo.py`: Placeholder for PPO with DWL denoising and latent regularization losses.
 - `rsl_rl/dwl_runner.py`: Placeholder for the runner that wires Isaac Lab observation groups into the DWL training loop.
 - `tests/test_gait.py`: Regression tests for gait phase wrapping, clock inputs, stance masks, and quintic foot references.
+- `tests/test_observations.py`: Regression tests for DWL observation helper conventions such as quaternion-to-RPY orientation.
 - `.gitignore`: Keeps local caches, logs, checkpoints, and `DWL.pdf` out of git.
 
 ## `gait.py`
@@ -69,6 +70,46 @@ The file is intentionally independent from Isaac Lab manager APIs. The expected 
 - `dwl_env_cfg.py` will configure the observation and reward terms that use these helpers.
 - `rsl_rl/dwl_model.py` will indirectly receive these signals through the policy and privileged/state observation groups.
 - `tests/test_gait.py` keeps the gait conventions stable while observations and rewards are implemented.
+
+## `observations.py`
+
+`observations.py` defines the DWL policy and privileged/state observation terms. The policy group is restricted to signals that should be available on the real robot, while the privileged/state group contains simulation-only information for the critic and decoder target.
+
+Policy terms:
+
+- `policy_clock`: Gait clock `[sin(phase), cos(phase)]`.
+- `policy_velocity_commands`: Commanded base velocity.
+- `policy_joint_pos`: Controlled leg joint positions relative to default.
+- `policy_joint_vel`: Controlled leg joint velocities relative to default.
+- `policy_base_ang_vel`: Base angular velocity.
+- `policy_base_orientation`: Paper-aligned base orientation as RPY.
+- `policy_last_action`: Previous action.
+
+Privileged/state terms:
+
+- `state_base_lin_vel`: Base linear velocity.
+- `state_friction`: Per-env friction scalar, currently read from `env.dwl_friction` with a neutral fallback.
+- `state_push_force_torques`: External push force/torque vector, currently read from `env.dwl_push_force_torques` with a zero fallback.
+- `state_cycle_time`: Gait cycle time.
+- `state_stance_mask`: Periodic stance mask.
+- `state_feet_movement`: Foot positions and linear velocities.
+- `state_feet_contact`: Binary foot contact mask from contact forces.
+- `state_body_mass`: Total selected body mass.
+- `state_current_reward`: Current reward buffer.
+- `state_joint_torques`: Applied torques for controlled joints.
+- `state_height_scan`: Privileged terrain height scan.
+
+Helpers and conventions:
+
+- `quat_to_rpy`: Converts Isaac Lab XYZW root quaternions into `[roll, pitch, yaw]`.
+- `base_orientation_rpy`: Paper-aligned orientation term matching Table I's Euler orientation component.
+- `base_orientation_projected_gravity`: Isaac Lab locomotion-style orientation proxy for experiments that prefer projected gravity.
+- `CONTROLLED_LEG_JOINT_NAMES`: The 12 leg joint regex patterns used for DWL control.
+- `FOOT_BODY_NAMES`: The foot body regex patterns used by foot movement/contact terms.
+- `make_policy_observation_terms`: Builds the policy observation term map for `dwl_env_cfg.py`.
+- `make_privileged_observation_terms`: Builds the privileged/state observation term map for `dwl_env_cfg.py`.
+
+The DWL default direction is to keep `base_lin_vel` and `height_scan` out of the policy observation group and place them in the privileged/state group. Orientation is explicit because the paper uses Euler angles, while many Isaac Lab locomotion baselines use projected gravity.
 
 ## Implementation Order
 
