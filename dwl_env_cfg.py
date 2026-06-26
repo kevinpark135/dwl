@@ -199,6 +199,52 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
             mode="startup",
             params={"friction_range": (0.2, 2.0)},
         )
+        self.events.joint_position_observation_noise = EventTerm(
+            func=dwl_events.randomize_joint_position_observation_noise,
+            mode="startup",
+            params={"noise_range": (-0.3, 0.3)},
+        )
+        self.events.joint_velocity_observation_noise = EventTerm(
+            func=dwl_events.randomize_joint_velocity_observation_noise,
+            mode="startup",
+            params={"noise_range": (-1.0, 1.0)},
+        )
+        self.events.angular_velocity_observation_noise = EventTerm(
+            func=dwl_events.randomize_angular_velocity_observation_noise,
+            mode="startup",
+            params={"noise_range": (-0.1, 0.1)},
+        )
+        self.events.orientation_observation_noise = EventTerm(
+            func=dwl_events.randomize_orientation_observation_noise,
+            mode="startup",
+            params={"noise_range": (-0.1, 0.1)},
+        )
+        self.events.system_delay = EventTerm(
+            func=dwl_events.randomize_system_delay,
+            mode="startup",
+            params={"delay_range_s": (0.0, 0.01)},
+        )
+        self.events.motor_offset = EventTerm(
+            func=dwl_events.randomize_motor_offset,
+            mode="startup",
+            params={"offset_range": (-0.05, 0.05), "asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG},
+        )
+        self.events.motor_strength = EventTerm(
+            func=dwl_events.randomize_motor_strength,
+            mode="startup",
+            params={
+                "strength_distribution_params": (0.9, 1.1),
+                "asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG,
+            },
+        )
+        self.events.pd_factors = EventTerm(
+            func=dwl_events.randomize_pd_factors,
+            mode="startup",
+            params={
+                "pd_factor_distribution_params": (0.8, 1.2),
+                "asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG,
+            },
+        )
         self.events.physics_material.params["static_friction_range"] = (0.2, 2.0)
         self.events.physics_material.params["dynamic_friction_range"] = (0.2, 2.0)
         self.events.add_base_mass = EventTerm(
@@ -287,6 +333,16 @@ class G1DwlEnvCfg_PLAY(G1DwlEnvCfg):
         self.commands.base_velocity.ranges.heading = (0.0, 0.0)
         # disable randomization for play
         self.observations.policy.enable_corruption = False
+        self.events.store_friction = None
+        self.events.joint_position_observation_noise = None
+        self.events.joint_velocity_observation_noise = None
+        self.events.angular_velocity_observation_noise = None
+        self.events.orientation_observation_noise = None
+        self.events.system_delay = None
+        self.events.motor_offset = None
+        self.events.motor_strength = None
+        self.events.pd_factors = None
+        self.events.add_base_mass = None
         # remove random pushing
         self.events.base_external_force_torque = None
         self.events.push_force_torques = None

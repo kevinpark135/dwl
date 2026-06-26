@@ -33,6 +33,11 @@ def test_dwl_env_cfg_wires_dwl_events():
     assert cfg.events.store_friction.params["friction_range"] == (0.2, 2.0)
     assert cfg.events.physics_material.params["static_friction_range"] == (0.2, 2.0)
     assert cfg.events.reset_robot_joints.params["position_range"] == (-0.3, 0.3)
+    assert cfg.events.system_delay.params["delay_range_s"] == (0.0, 0.01)
+    assert cfg.events.motor_offset.params["offset_range"] == (-0.05, 0.05)
+    assert cfg.events.motor_strength.params["strength_distribution_params"] == (0.9, 1.1)
+    assert cfg.events.pd_factors.params["pd_factor_distribution_params"] == (0.8, 1.2)
+    assert cfg.events.joint_position_observation_noise.params["noise_range"] == (-0.3, 0.3)
     assert cfg.events.push_force_torques is not None
 
 
@@ -40,5 +45,11 @@ def test_play_cfg_disables_policy_noise_and_push_wrenches():
     cfg = G1DwlEnvCfg_PLAY()
 
     assert not cfg.observations.policy.enable_corruption
+    assert cfg.events.store_friction is None
+    assert cfg.events.system_delay is None
+    assert cfg.events.motor_offset is None
+    assert cfg.events.motor_strength is None
+    assert cfg.events.pd_factors is None
+    assert cfg.events.add_base_mass is None
     assert cfg.events.base_external_force_torque is None
     assert cfg.events.push_force_torques is None

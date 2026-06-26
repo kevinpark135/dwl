@@ -9,11 +9,21 @@ from isaaclab.managers import SceneEntityCfg
 
 from events import (
     DWL_FRICTION_ATTR,
+    DWL_MOTOR_OFFSET_ATTR,
+    DWL_MOTOR_STRENGTH_ATTR,
+    DWL_OBSERVATION_NOISE_RANGES_ATTR,
+    DWL_PD_FACTORS_ATTR,
     DWL_PUSH_FORCE_TORQUES_ATTR,
+    DWL_SYSTEM_DELAY_ATTR,
     clear_push_force_torques,
     init_dwl_event_buffers,
     randomize_body_mass,
+    randomize_motor_offset,
+    randomize_motor_strength,
+    randomize_pd_factors,
+    randomize_system_delay,
     randomize_joint_reset_noise,
+    randomize_joint_position_observation_noise,
     sample_push_force_torques,
     store_friction,
 )
@@ -43,6 +53,14 @@ class MockAsset:
         self.num_bodies = 2
         self.num_joints = 2
         self.permanent_wrench_composer = MockWrenchComposer()
+        self.actuators = {
+            "legs": SimpleNamespace(
+                joint_indices=torch.tensor([0, 1]),
+                effort_limit=torch.full((2, 2), 100.0),
+                stiffness=torch.full((2, 2), 20.0),
+                damping=torch.full((2, 2), 5.0),
+            )
+        }
         self.data = SimpleNamespace(
             body_mass=SimpleNamespace(torch=torch.full((2, 2), 10.0)),
             default_joint_pos=SimpleNamespace(torch=torch.zeros(2, 2)),
@@ -77,6 +95,8 @@ def test_init_and_clear_dwl_event_buffers():
     init_dwl_event_buffers(env)
     assert torch.allclose(getattr(env, DWL_FRICTION_ATTR), torch.ones(2, 1))
     assert torch.allclose(getattr(env, DWL_PUSH_FORCE_TORQUES_ATTR), torch.zeros(2, 6))
+    assert torch.allclose(getattr(env, DWL_SYSTEM_DELAY_ATTR), torch.zeros(2, 1))
+    assert getattr(env, DWL_OBSERVATION_NOISE_RANGES_ATTR)["joint_position"] == (-0.3, 0.3)
 
     getattr(env, DWL_PUSH_FORCE_TORQUES_ATTR)[:] = 1.0
     clear_push_force_torques(env, torch.tensor([0]))
@@ -127,3 +147,63 @@ def test_randomize_joint_reset_noise_writes_clamped_joint_state():
 
     assert torch.allclose(env.scene["robot"].written_joint_pos, torch.full((2, 2), 0.5))
     assert torch.allclose(env.scene["robot"].written_joint_vel, torch.full((2, 2), 0.25))
+
+
+def test_observation_noise_events_record_ranges():
+    env = _mock_env()
+
+    randomize_joint_position_observation_noise(env, noise_range=(-0.2, 0.2))
+
+    assert getattr(env, DWL_OBSERVATION_NOISE_RANGES_ATTR)["joint_position"] == (-0.2, 0.2)
+
+
+def test_randomize_system_delay_samples_and_stores_delay():
+    env = _mock_env()
+
+    delay = randomize_system_delay(env, None, delay_range_s=(0.01, 0.01))
+
+    assert torch.allclose(delay, torch.full((2, 1), 0.01))
+    assert torch.allclose(getattr(env, DWL_SYSTEM_DELAY_ATTR), torch.full((2, 1), 0.01))
+
+
+def test_randomize_motor_offset_samples_and_stores_offsets():
+    env = _mock_env()
+    asset_cfg = SceneEntityCfg("robot", joint_ids=[0, 1])
+
+    offsets = randomize_motor_offset(env, None, offset_range=(0.05, 0.05), asset_cfg=asset_cfg)
+
+    assert torch.allclose(offsets, torch.full((2, 2), 0.05))
+    assert torch.allclose(getattr(env, DWL_MOTOR_OFFSET_ATTR), torch.full((2, 2), 0.05))
+
+
+def test_randomize_motor_strength_scales_actuator_effort_limits():
+    env = _mock_env()
+    asset_cfg = SceneEntityCfg("robot", joint_ids=[0, 1])
+
+    strength = randomize_motor_strength(
+        env,
+        None,
+        strength_distribution_params=(1.1, 1.1),
+        asset_cfg=asset_cfg,
+    )
+
+    assert torch.allclose(strength, torch.full((2, 2), 1.1))
+    assert torch.allclose(env.scene["robot"].actuators["legs"].effort_limit, torch.full((2, 2), 110.0))
+    assert torch.allclose(getattr(env, DWL_MOTOR_STRENGTH_ATTR), torch.full((2, 2), 1.1))
+
+
+def test_randomize_pd_factors_scales_actuator_stiffness_and_damping():
+    env = _mock_env()
+    asset_cfg = SceneEntityCfg("robot", joint_ids=[0, 1])
+
+    factors = randomize_pd_factors(
+        env,
+        None,
+        pd_factor_distribution_params=(1.2, 1.2),
+        asset_cfg=asset_cfg,
+    )
+
+    assert torch.allclose(factors, torch.full((2, 2, 2), 1.2))
+    assert torch.allclose(env.scene["robot"].actuators["legs"].stiffness, torch.full((2, 2), 24.0))
+    assert torch.allclose(env.scene["robot"].actuators["legs"].damping, torch.full((2, 2), 6.0))
+    assert torch.allclose(getattr(env, DWL_PD_FACTORS_ATTR), torch.full((2, 2, 2), 1.2))

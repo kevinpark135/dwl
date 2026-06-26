@@ -32,6 +32,7 @@ DWL_MOTOR_OFFSET_ATTR = "dwl_motor_offset"
 DWL_MOTOR_STRENGTH_ATTR = "dwl_motor_strength"
 DWL_PD_FACTORS_ATTR = "dwl_pd_factors"
 DWL_SYSTEM_DELAY_ATTR = "dwl_system_delay_s"
+DWL_OBSERVATION_NOISE_RANGES_ATTR = "dwl_observation_noise_ranges"
 
 
 def _num_envs(env: "ManagerBasedEnv") -> int:
@@ -68,6 +69,23 @@ def _resolve_joint_ids(asset, asset_cfg: SceneEntityCfg, device: torch.device) -
     return torch.as_tensor(asset_cfg.joint_ids, dtype=torch.long, device=device)
 
 
+def _joint_ids_tensor(asset, asset_cfg: SceneEntityCfg, device: torch.device) -> torch.Tensor:
+    joint_ids = _resolve_joint_ids(asset, asset_cfg, device)
+    if isinstance(joint_ids, slice):
+        return torch.arange(asset.num_joints, dtype=torch.long, device=device)
+    return joint_ids
+
+
+def _joint_positions(requested_joint_ids: torch.Tensor, sim_joint_ids: torch.Tensor) -> torch.Tensor:
+    positions = []
+    for joint_id in sim_joint_ids:
+        match = torch.nonzero(requested_joint_ids == joint_id, as_tuple=False).flatten()
+        if match.numel() == 0:
+            raise RuntimeError(f"Joint id {int(joint_id)} was not found in requested joint ids.")
+        positions.append(match[0])
+    return torch.stack(positions)
+
+
 def init_dwl_event_buffers(env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None) -> None:
     """Initialize privileged buffers used by DWL observations."""
 
@@ -76,6 +94,19 @@ def init_dwl_event_buffers(env: "ManagerBasedEnv", env_ids: torch.Tensor | None 
     setattr(env, DWL_FRICTION_ATTR, torch.ones(num_envs, 1, device=device))
     setattr(env, DWL_PUSH_FORCE_TORQUES_ATTR, torch.zeros(num_envs, 6, device=device))
     setattr(env, DWL_SYSTEM_DELAY_ATTR, torch.zeros(num_envs, 1, device=device))
+    setattr(env, DWL_MOTOR_OFFSET_ATTR, torch.zeros(num_envs, 0, device=device))
+    setattr(env, DWL_MOTOR_STRENGTH_ATTR, torch.ones(num_envs, 0, device=device))
+    setattr(env, DWL_PD_FACTORS_ATTR, torch.ones(num_envs, 0, 2, device=device))
+    setattr(
+        env,
+        DWL_OBSERVATION_NOISE_RANGES_ATTR,
+        {
+            "joint_position": (-0.3, 0.3),
+            "joint_velocity": (-1.0, 1.0),
+            "angular_velocity": (-0.1, 0.1),
+            "orientation": (-0.1, 0.1),
+        },
+    )
 
 
 def clear_push_force_torques(env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None) -> None:
@@ -195,73 +226,244 @@ def randomize_joint_reset_noise(
     asset.write_joint_velocity_to_sim_index(velocity=joint_vel, joint_ids=joint_ids, env_ids=ids)
 
 
-def randomize_joint_position_observation_noise(*args, **kwargs):
-    """Stub for DWL joint position observation noise `[-0.3, 0.3]`.
+def randomize_joint_position_observation_noise(
+    env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None, noise_range: tuple[float, float] = (-0.3, 0.3)
+) -> None:
+    """Record the DWL joint-position observation noise range.
 
-    TODO: wire this through ObservationTerm noise configs rather than event state.
+    The actual noise is applied by `ObservationTermCfg.noise` in `dwl_env_cfg.py`;
+    this event keeps the paper term named and inspectable.
     """
 
-    raise NotImplementedError("Joint position observation noise belongs in observation noise config.")
+    if not hasattr(env, DWL_OBSERVATION_NOISE_RANGES_ATTR):
+        init_dwl_event_buffers(env)
+    getattr(env, DWL_OBSERVATION_NOISE_RANGES_ATTR)["joint_position"] = noise_range
 
 
-def randomize_joint_velocity_observation_noise(*args, **kwargs):
-    """Stub for DWL joint velocity observation noise `[-1, 1]`.
+def randomize_joint_velocity_observation_noise(
+    env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None, noise_range: tuple[float, float] = (-1.0, 1.0)
+) -> None:
+    """Record the DWL joint-velocity observation noise range."""
 
-    TODO: wire this through ObservationTerm noise configs rather than event state.
+    if not hasattr(env, DWL_OBSERVATION_NOISE_RANGES_ATTR):
+        init_dwl_event_buffers(env)
+    getattr(env, DWL_OBSERVATION_NOISE_RANGES_ATTR)["joint_velocity"] = noise_range
+
+
+def randomize_angular_velocity_observation_noise(
+    env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None, noise_range: tuple[float, float] = (-0.1, 0.1)
+) -> None:
+    """Record the DWL angular-velocity observation noise range."""
+
+    if not hasattr(env, DWL_OBSERVATION_NOISE_RANGES_ATTR):
+        init_dwl_event_buffers(env)
+    getattr(env, DWL_OBSERVATION_NOISE_RANGES_ATTR)["angular_velocity"] = noise_range
+
+
+def randomize_orientation_observation_noise(
+    env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None, noise_range: tuple[float, float] = (-0.1, 0.1)
+) -> None:
+    """Record the DWL orientation observation noise range."""
+
+    if not hasattr(env, DWL_OBSERVATION_NOISE_RANGES_ATTR):
+        init_dwl_event_buffers(env)
+    getattr(env, DWL_OBSERVATION_NOISE_RANGES_ATTR)["orientation"] = noise_range
+
+
+def randomize_system_delay(
+    env: "ManagerBasedEnv",
+    env_ids: torch.Tensor | None,
+    delay_range_s: tuple[float, float] = (0.0, 0.01),
+) -> torch.Tensor:
+    """Sample/store system delay values in seconds.
+
+    The event stores `env.dwl_system_delay_s`. Action/observation delay buffers
+    should consume this value when the DWL runner or wrapper is implemented.
     """
 
-    raise NotImplementedError("Joint velocity observation noise belongs in observation noise config.")
+    device = _device(env)
+    ids = _resolve_env_ids(env, env_ids, device)
+    if not hasattr(env, DWL_SYSTEM_DELAY_ATTR):
+        init_dwl_event_buffers(env)
+    delay = sample_uniform(*delay_range_s, (ids.numel(), 1), device)
+    getattr(env, DWL_SYSTEM_DELAY_ATTR)[ids] = delay
+    return delay
 
 
-def randomize_angular_velocity_observation_noise(*args, **kwargs):
-    """Stub for DWL angular velocity observation noise `[-0.1, 0.1]`.
+def randomize_motor_offset(
+    env: "ManagerBasedEnv",
+    env_ids: torch.Tensor | None,
+    offset_range: tuple[float, float] = (-0.05, 0.05),
+    asset_cfg: SceneEntityCfg = DEFAULT_CONTROLLED_JOINT_CFG,
+) -> torch.Tensor:
+    """Sample/store motor target offsets for selected joints.
 
-    TODO: wire this through ObservationTerm noise configs rather than event state.
+    The sampled offsets are stored in `env.dwl_motor_offset`. The action target
+    processing path should add these offsets when action integration is wired.
     """
 
-    raise NotImplementedError("Angular velocity observation noise belongs in observation noise config.")
+    asset = env.scene[asset_cfg.name]
+    ids = _resolve_env_ids(env, env_ids, asset.device)
+    joint_ids = _joint_ids_tensor(asset, asset_cfg, asset.device)
+    offsets = sample_uniform(*offset_range, (ids.numel(), joint_ids.numel()), asset.device)
+
+    buffer = getattr(env, DWL_MOTOR_OFFSET_ATTR, None)
+    if buffer is None or buffer.shape != (_num_envs(env), joint_ids.numel()):
+        buffer = torch.zeros((_num_envs(env), joint_ids.numel()), device=asset.device)
+        setattr(env, DWL_MOTOR_OFFSET_ATTR, buffer.to(_device(env)))
+        buffer = getattr(env, DWL_MOTOR_OFFSET_ATTR)
+    buffer[ids.to(_device(env))] = offsets.to(_device(env))
+    return offsets
 
 
-def randomize_orientation_observation_noise(*args, **kwargs):
-    """Stub for DWL orientation observation noise `[-0.1, 0.1]`.
+def randomize_motor_strength(
+    env: "ManagerBasedEnv",
+    env_ids: torch.Tensor | None,
+    strength_distribution_params: tuple[float, float] = (0.9, 1.1),
+    asset_cfg: SceneEntityCfg = DEFAULT_CONTROLLED_JOINT_CFG,
+) -> torch.Tensor:
+    """Scale actuator effort limits to emulate motor strength variation."""
 
-    TODO: wire this through ObservationTerm noise configs rather than event state.
-    """
+    from isaaclab.actuators import ImplicitActuator
 
-    raise NotImplementedError("Orientation observation noise belongs in observation noise config.")
+    asset = env.scene[asset_cfg.name]
+    ids = _resolve_env_ids(env, env_ids, asset.device)
+    requested_joint_ids = _joint_ids_tensor(asset, asset_cfg, asset.device)
+    low, high = strength_distribution_params
+    stored_strength = torch.ones((ids.numel(), requested_joint_ids.numel()), device=asset.device)
+
+    default_key = "_dwl_default_motor_strength"
+    if not hasattr(asset, default_key):
+        defaults = {}
+        for name, actuator in getattr(asset, "actuators", {}).items():
+            defaults[name] = {"effort_limit": actuator.effort_limit.clone()}
+            if hasattr(actuator, "_saturation_effort"):
+                saturation = actuator._saturation_effort
+                if not isinstance(saturation, torch.Tensor):
+                    saturation = torch.full_like(actuator.effort_limit, float(saturation))
+                defaults[name]["saturation_effort"] = saturation.clone()
+        setattr(asset, default_key, defaults)
+    defaults = getattr(asset, default_key)
+
+    for name, actuator in getattr(asset, "actuators", {}).items():
+        actuator_joint_ids = actuator.joint_indices
+        if isinstance(actuator_joint_ids, slice):
+            global_joint_ids = torch.arange(asset.num_joints, dtype=torch.long, device=asset.device)
+        else:
+            global_joint_ids = actuator_joint_ids.to(asset.device)
+
+        mask = torch.isin(global_joint_ids, requested_joint_ids)
+        if not torch.any(mask):
+            continue
+        actuator_indices = torch.nonzero(mask, as_tuple=False).flatten()
+        sim_joint_ids = global_joint_ids[actuator_indices]
+        strength = sample_uniform(low, high, (ids.numel(), actuator_indices.numel()), asset.device)
+
+        effort_limit = actuator.effort_limit[ids].clone()
+        effort_limit[:, actuator_indices] = defaults[name]["effort_limit"][ids][:, actuator_indices] * strength
+        actuator.effort_limit[ids] = effort_limit
+
+        if "saturation_effort" in defaults[name]:
+            saturation_effort = getattr(actuator, "_saturation_effort")
+            if not isinstance(saturation_effort, torch.Tensor):
+                saturation_effort = defaults[name]["saturation_effort"].clone()
+            else:
+                saturation_effort = saturation_effort.clone()
+            saturation_effort[ids[:, None], actuator_indices] = (
+                defaults[name]["saturation_effort"][ids[:, None], actuator_indices] * strength
+            )
+            actuator._saturation_effort = saturation_effort
+            if hasattr(actuator, "_vel_at_effort_lim"):
+                actuator._vel_at_effort_lim = actuator.velocity_limit * (
+                    1.0 + actuator.effort_limit / actuator._saturation_effort
+                )
+
+        if isinstance(actuator, ImplicitActuator):
+            asset.write_joint_effort_limit_to_sim_index(
+                limits=effort_limit[:, actuator_indices],
+                joint_ids=sim_joint_ids,
+                env_ids=ids,
+            )
+
+        global_pos = _joint_positions(requested_joint_ids, sim_joint_ids)
+        stored_strength[:, global_pos] = strength
+
+    buffer = torch.ones((_num_envs(env), requested_joint_ids.numel()), device=_device(env))
+    if hasattr(env, DWL_MOTOR_STRENGTH_ATTR) and getattr(env, DWL_MOTOR_STRENGTH_ATTR).shape == buffer.shape:
+        buffer = getattr(env, DWL_MOTOR_STRENGTH_ATTR)
+    else:
+        setattr(env, DWL_MOTOR_STRENGTH_ATTR, buffer)
+    getattr(env, DWL_MOTOR_STRENGTH_ATTR)[ids.to(_device(env))] = stored_strength.to(_device(env))
+    return stored_strength
 
 
-def randomize_system_delay(*args, **kwargs):
-    """Stub for DWL system delay randomization `[0, 10] ms`.
+def randomize_pd_factors(
+    env: "ManagerBasedEnv",
+    env_ids: torch.Tensor | None,
+    pd_factor_distribution_params: tuple[float, float] = (0.8, 1.2),
+    asset_cfg: SceneEntityCfg = DEFAULT_CONTROLLED_JOINT_CFG,
+) -> torch.Tensor:
+    """Scale actuator stiffness/damping factors for selected joints."""
 
-    TODO: implement with an action/observation delay buffer in the env or runner.
-    """
+    from isaaclab.actuators import ImplicitActuator
 
-    raise NotImplementedError("System delay requires action/observation delay buffers.")
+    asset = env.scene[asset_cfg.name]
+    ids = _resolve_env_ids(env, env_ids, asset.device)
+    requested_joint_ids = _joint_ids_tensor(asset, asset_cfg, asset.device)
+    low, high = pd_factor_distribution_params
+    stored_factors = torch.ones((ids.numel(), requested_joint_ids.numel(), 2), device=asset.device)
 
+    default_key = "_dwl_default_pd_factors"
+    if not hasattr(asset, default_key):
+        defaults = {}
+        for name, actuator in getattr(asset, "actuators", {}).items():
+            defaults[name] = {
+                "stiffness": actuator.stiffness.clone(),
+                "damping": actuator.damping.clone(),
+            }
+        setattr(asset, default_key, defaults)
+    defaults = getattr(asset, default_key)
 
-def randomize_motor_offset(*args, **kwargs):
-    """Stub for DWL motor offset randomization `[-0.05, 0.05]` rad.
+    for name, actuator in getattr(asset, "actuators", {}).items():
+        actuator_joint_ids = actuator.joint_indices
+        if isinstance(actuator_joint_ids, slice):
+            global_joint_ids = torch.arange(asset.num_joints, dtype=torch.long, device=asset.device)
+        else:
+            global_joint_ids = actuator_joint_ids.to(asset.device)
 
-    TODO: connect sampled offsets to the action target processing path.
-    """
+        mask = torch.isin(global_joint_ids, requested_joint_ids)
+        if not torch.any(mask):
+            continue
+        actuator_indices = torch.nonzero(mask, as_tuple=False).flatten()
+        sim_joint_ids = global_joint_ids[actuator_indices]
+        factors = sample_uniform(low, high, (ids.numel(), actuator_indices.numel(), 2), asset.device)
 
-    raise NotImplementedError("Motor offset requires action target processing integration.")
+        stiffness = actuator.stiffness[ids].clone()
+        damping = actuator.damping[ids].clone()
+        stiffness[:, actuator_indices] = defaults[name]["stiffness"][ids][:, actuator_indices] * factors[..., 0]
+        damping[:, actuator_indices] = defaults[name]["damping"][ids][:, actuator_indices] * factors[..., 1]
+        actuator.stiffness[ids] = stiffness
+        actuator.damping[ids] = damping
 
+        if isinstance(actuator, ImplicitActuator):
+            asset.write_joint_stiffness_to_sim_index(
+                stiffness=stiffness[:, actuator_indices],
+                joint_ids=sim_joint_ids,
+                env_ids=ids,
+            )
+            asset.write_joint_damping_to_sim_index(
+                damping=damping[:, actuator_indices],
+                joint_ids=sim_joint_ids,
+                env_ids=ids,
+            )
 
-def randomize_motor_strength(*args, **kwargs):
-    """Stub for DWL motor strength scaling `[0.9, 1.1]`.
+        global_pos = _joint_positions(requested_joint_ids, sim_joint_ids)
+        stored_factors[:, global_pos, :] = factors
 
-    TODO: connect to actuator effort limits/saturation fields for the selected actuator type.
-    """
-
-    raise NotImplementedError("Motor strength requires actuator API integration.")
-
-
-def randomize_pd_factors(*args, **kwargs):
-    """Stub for DWL PD gain scaling `[0.8, 1.2]`.
-
-    TODO: connect to actuator stiffness/damping fields for the selected actuator type.
-    """
-
-    raise NotImplementedError("PD factor randomization requires actuator gain integration.")
+    buffer = torch.ones((_num_envs(env), requested_joint_ids.numel(), 2), device=_device(env))
+    if hasattr(env, DWL_PD_FACTORS_ATTR) and getattr(env, DWL_PD_FACTORS_ATTR).shape == buffer.shape:
+        buffer = getattr(env, DWL_PD_FACTORS_ATTR)
+    else:
+        setattr(env, DWL_PD_FACTORS_ATTR, buffer)
+    getattr(env, DWL_PD_FACTORS_ATTR)[ids.to(_device(env))] = stored_factors.to(_device(env))
+    return stored_factors
