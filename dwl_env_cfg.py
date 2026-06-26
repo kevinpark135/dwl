@@ -3,6 +3,12 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+"""Environment configuration for the DWL G1 locomotion task.
+
+This file currently adapts Isaac Lab's rough locomotion base configuration for
+G1. As DWL is implemented, it will be wired to the local observation, reward,
+event, and gait modules.
+"""
 
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg

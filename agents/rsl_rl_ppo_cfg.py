@@ -3,6 +3,12 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+"""RSL-RL runner configuration for the DWL G1 task.
+
+This file starts from the existing PPO setup and will later point to the custom
+DWL model, PPO extension, and runner.
+"""
+
 from isaaclab.utils.configclass import configclass
 
 from isaaclab_rl.rsl_rl import RslRlMLPModelCfg, RslRlOnPolicyRunnerCfg, RslRlPpoAlgorithmCfg

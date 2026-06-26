@@ -3,6 +3,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+"""Gym registration for the Isaac Lab DWL G1 locomotion tasks."""
+
 import gymnasium as gym
 
 from . import agents

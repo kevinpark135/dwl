@@ -2,3 +2,5 @@
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
+
+"""Agent configuration package for the DWL Isaac Lab task."""
