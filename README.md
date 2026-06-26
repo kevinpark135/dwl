@@ -49,6 +49,7 @@ dwl/
 - `rsl_rl/dwl_runner.py`: Placeholder for the runner that wires Isaac Lab observation groups into the DWL training loop.
 - `tests/test_gait.py`: Regression tests for gait phase wrapping, clock inputs, stance masks, and quintic foot references.
 - `tests/test_observations.py`: Regression tests for DWL observation helper conventions such as quaternion-to-RPY orientation.
+- `tests/test_rewards.py`: Regression tests for DWL reward kernels, phase-aware rewards, foot tracking, and regularization terms.
 - `.gitignore`: Keeps local caches, logs, checkpoints, and `DWL.pdf` out of git.
 
 ## `gait.py`
@@ -111,11 +112,32 @@ Helpers and conventions:
 
 The DWL default direction is to keep `base_lin_vel` and `height_scan` out of the policy observation group and place them in the privileged/state group. Orientation is explicit because the paper uses Euler angles, while many Isaac Lab locomotion baselines use projected gravity.
 
+## `rewards.py`
+
+`rewards.py` implements the DWL paper reward table as Isaac Lab reward terms:
+
+- `lin_velocity_tracking`: Tracks commanded base linear velocity with zero vertical command.
+- `lin_velocity_tracking_yaw_frame`: Compatibility wrapper for Isaac Lab's yaw-frame XY velocity tracking.
+- `ang_velocity_tracking`: Tracks commanded yaw rate while keeping roll/pitch rates near zero.
+- `orientation_tracking`: Tracks upright orientation.
+- `base_height_tracking`: Tracks the target base height.
+- `periodic_force`: Rewards contact force on the foot currently expected to be in stance.
+- `periodic_velocity`: Rewards movement of the foot currently expected to be in swing.
+- `foot_height_tracking`: Tracks the quintic swing-foot height reference.
+- `foot_velocity_tracking`: Tracks the quintic swing-foot vertical velocity reference.
+- `default_joint_tracking`: Rewards staying near the default controlled-joint posture.
+- `energy_cost`: Computes `sum(|tau| * |qdot|)`.
+- `action_smoothness`: Computes the second-order action difference.
+- `feet_movement`: Penalizes foot velocity and acceleration.
+- `large_contact`: Penalizes excessive foot contact force.
+
+The gait helpers matter here because four rewards are phase-aware: `periodic_force`, `periodic_velocity`, `foot_height_tracking`, and `foot_velocity_tracking`. They must use the same clock, stance mask, and foot trajectory reference as the observations; otherwise the policy could observe one gait phase while rewards score another.
+
 ## Implementation Order
 
 1. Implement `gait.py` clock signals, stance masks, and quintic foot trajectory helpers. Basic utilities and tests are now in place.
 2. Implement `observations.py` with separate policy and privileged/state observation terms.
-3. Implement `rewards.py` using the DWL paper reward table and the gait helpers.
+3. Implement `rewards.py` using the DWL paper reward table and the gait helpers. Basic reward terms and tests are now in place.
 4. Implement `events.py` domain randomization for noise, friction, mass/payload, motor, PD, push, and delay effects.
 5. Wire the new observation, reward, and event terms into `dwl_env_cfg.py`.
 6. Implement `rsl_rl/dwl_model.py` with the encoder, decoder, actor, and critic.
