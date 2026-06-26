@@ -28,7 +28,9 @@ dwl/
 │   ├── dwl_ppo.py
 │   └── dwl_runner.py
 ├── tests/
-│   └── test_gait.py
+│   ├── test_gait.py
+│   ├── test_observations.py
+│   └── test_rewards.py
 ├── README.md
 └── .gitignore
 ```
@@ -37,10 +39,10 @@ dwl/
 
 - `__init__.py`: Registers the DWL train/play Gym environments with Isaac Lab.
 - `dwl_env_cfg.py`: Defines the G1 DWL environment configuration by adapting the Isaac Lab rough locomotion base cfg.
-- `observations.py`: Placeholder for policy observations and privileged/state observations used by DWL.
-- `rewards.py`: Placeholder for paper-specific reward terms such as velocity tracking, periodic gait rewards, foot tracking, and regularization.
+- `observations.py`: Defines policy observations and privileged/state observations used by DWL.
+- `rewards.py`: Defines paper-specific reward terms such as velocity tracking, periodic gait rewards, foot tracking, and regularization.
 - `events.py`: Placeholder for DWL domain randomization and perturbation events.
-- `gait.py`: Placeholder for gait phase, stance masks, clock inputs, and quintic foot trajectory references.
+- `gait.py`: Defines gait phase, stance masks, clock inputs, and quintic foot trajectory references.
 - `agents/__init__.py`: Marks the agent configuration package.
 - `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration and will later point to the DWL custom model/algorithm/runner.
 - `rsl_rl/__init__.py`: Marks the local RSL-RL extension package for DWL.
@@ -133,15 +135,19 @@ The DWL default direction is to keep `base_lin_vel` and `height_scan` out of the
 
 The gait helpers matter here because four rewards are phase-aware: `periodic_force`, `periodic_velocity`, `foot_height_tracking`, and `foot_velocity_tracking`. They must use the same clock, stance mask, and foot trajectory reference as the observations; otherwise the policy could observe one gait phase while rewards score another.
 
-## Implementation Order
+## Implemented
 
-1. Implement `gait.py` clock signals, stance masks, and quintic foot trajectory helpers. Basic utilities and tests are now in place.
-2. Implement `observations.py` with separate policy and privileged/state observation terms.
-3. Implement `rewards.py` using the DWL paper reward table and the gait helpers. Basic reward terms and tests are now in place.
-4. Implement `events.py` domain randomization for noise, friction, mass/payload, motor, PD, push, and delay effects.
-5. Wire the new observation, reward, and event terms into `dwl_env_cfg.py`.
-6. Implement `rsl_rl/dwl_model.py` with the encoder, decoder, actor, and critic.
-7. Implement `rsl_rl/dwl_ppo.py` by adding reconstruction and latent L1 losses to PPO.
-8. Implement `rsl_rl/dwl_runner.py` to pass privileged reconstruction targets through rollout and training.
-9. Update `agents/rsl_rl_ppo_cfg.py` with DWL architecture paths and paper-aligned hyperparameters.
-10. Train and compare the DWL policy against the current PPO baseline.
+- `gait.py`: Clock signals, stance masks, phase offsets, and quintic foot trajectory helpers.
+- `observations.py`: Policy and privileged/state observation term functions.
+- `rewards.py`: DWL paper reward table terms using the shared gait helpers.
+- `tests/`: Regression tests for gait, observation, and reward conventions.
+
+## Remaining Implementation Order
+
+1. Implement `events.py` domain randomization for noise, friction, mass/payload, motor, PD, push, and delay effects.
+2. Wire the new observation, reward, and event terms into `dwl_env_cfg.py`.
+3. Implement `rsl_rl/dwl_model.py` with the encoder, decoder, actor, and critic.
+4. Implement `rsl_rl/dwl_ppo.py` by adding reconstruction and latent L1 losses to PPO.
+5. Implement `rsl_rl/dwl_runner.py` to pass privileged reconstruction targets through rollout and training.
+6. Update `agents/rsl_rl_ppo_cfg.py` with DWL architecture paths and paper-aligned hyperparameters.
+7. Train and compare the DWL policy against the current PPO baseline.
