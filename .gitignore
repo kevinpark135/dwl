@@ -10,3 +10,5 @@ wandb/
 *.pt
 *.pth
 *.ckpt
+DWL.pdf
+
