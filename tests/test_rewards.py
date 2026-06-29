@@ -10,8 +10,11 @@ from isaaclab.managers import SceneEntityCfg
 from gait import DwlGaitCfg
 from rewards import (
     action_smoothness,
+    alive,
     base_height_tracking,
+    base_motion_penalty,
     default_joint_tracking,
+    double_support,
     energy_cost,
     foot_height_tracking,
     foot_velocity_tracking,
@@ -87,6 +90,19 @@ def test_velocity_and_height_tracking_are_one_when_at_target():
 
     assert torch.allclose(lin_velocity_tracking(env), torch.ones(1))
     assert torch.allclose(base_height_tracking(env), torch.ones(1))
+
+
+def test_stand_first_rewards_encourage_survival_stillness_and_double_support():
+    env = _mock_env()
+    sensor_cfg = SceneEntityCfg("contact_forces", body_ids=[0, 1])
+
+    env.scene.sensors["contact_forces"].data.net_forces_w.torch[:, 1, 2] = 350.0
+    assert torch.allclose(alive(env), torch.ones(1))
+    assert torch.allclose(double_support(env, sensor_cfg=sensor_cfg), torch.ones(1))
+
+    env.scene["robot"].data.root_lin_vel_b.torch[:] = torch.tensor([[1.0, 2.0, 3.0]])
+    env.scene["robot"].data.root_ang_vel_b.torch[:] = torch.tensor([[4.0, 5.0, 6.0]])
+    assert torch.allclose(base_motion_penalty(env), torch.tensor([55.0]))
 
 
 def test_periodic_force_rewards_stance_foot_contact():

@@ -10,6 +10,7 @@ from observations import CONTROLLED_LEG_JOINT_NAMES
 def test_dwl_env_cfg_wires_policy_and_privileged_observations():
     cfg = G1DwlEnvCfg()
 
+    assert not cfg.observations.policy.enable_corruption
     assert cfg.observations.policy.concatenate_terms
     assert cfg.observations.policy.history_length == 5
     assert cfg.observations.policy.flatten_history_dim
@@ -25,9 +26,12 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
 
     assert isinstance(cfg.actions.joint_pos, DwlJointPositionActionCfg)
     assert cfg.actions.joint_pos.joint_names == CONTROLLED_LEG_JOINT_NAMES
+    assert cfg.actions.joint_pos.scale == 0.25
     assert cfg.actions.joint_pos.max_delay_steps == 4
-    assert cfg.rewards.lin_velocity_tracking.weight == 1.0
-    assert cfg.rewards.periodic_force.weight == 0.2
+    assert cfg.rewards.alive.weight == 1.0
+    assert cfg.rewards.double_support.weight == 2.0
+    assert cfg.rewards.lin_velocity_tracking.weight == 0.2
+    assert cfg.rewards.periodic_force.weight == 0.0
     assert cfg.rewards.track_lin_vel_xy_exp is None
     assert cfg.rewards.dof_torques_l2 is None
 
@@ -38,10 +42,10 @@ def test_dwl_env_cfg_wires_dwl_events():
     assert cfg.events.init_dwl_buffers is not None
     assert cfg.events.store_friction.params["friction_range"] == (0.8, 1.2)
     assert cfg.events.physics_material.params["static_friction_range"] == (0.8, 1.2)
-    assert cfg.events.reset_robot_joints.params["position_range"] == (-0.05, 0.05)
-    assert cfg.events.reset_robot_joints.params["velocity_range"] == (-0.1, 0.1)
-    assert cfg.events.reset_base.params["pose_range"]["yaw"] == (-0.1, 0.1)
-    assert cfg.events.reset_base.params["velocity_range"]["roll"] == (-0.05, 0.05)
+    assert cfg.events.reset_robot_joints.params["position_range"] == (0.0, 0.0)
+    assert cfg.events.reset_robot_joints.params["velocity_range"] == (0.0, 0.0)
+    assert cfg.events.reset_base.params["pose_range"]["yaw"] == (0.0, 0.0)
+    assert cfg.events.reset_base.params["velocity_range"]["roll"] == (0.0, 0.0)
     assert cfg.scene.terrain.max_init_terrain_level == 0
     assert cfg.rewards.feet_movement.params["acceleration_scale"] == 10.0
     assert cfg.events.system_delay.params["delay_range_s"] == (0.0, 0.0)

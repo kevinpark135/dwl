@@ -121,46 +121,57 @@ class G1Observations:
 class G1Rewards(RewardsCfg):
     """Reward terms for the MDP."""
 
+    alive = RewTerm(func=dwl_rewards.alive, weight=1.0)
     termination_penalty = RewTerm(func=mdp.is_terminated, weight=-100.0)
+    base_motion_penalty = RewTerm(
+        func=dwl_rewards.base_motion_penalty,
+        weight=-0.5,
+        params={"asset_cfg": dwl_obs.DEFAULT_ROBOT_CFG},
+    )
+    double_support = RewTerm(
+        func=dwl_rewards.double_support,
+        weight=2.0,
+        params={"sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG},
+    )
     lin_velocity_tracking = RewTerm(
         func=dwl_rewards.lin_velocity_tracking,
-        weight=1.0,
+        weight=0.2,
         params={"command_name": "base_velocity", "tolerance": 5.0},
     )
     ang_velocity_tracking = RewTerm(
         func=dwl_rewards.ang_velocity_tracking,
-        weight=1.0,
+        weight=0.2,
         params={"command_name": "base_velocity", "tolerance": 7.0},
     )
-    orientation_tracking = RewTerm(func=dwl_rewards.orientation_tracking, weight=2.0, params={"tolerance": 5.0})
+    orientation_tracking = RewTerm(func=dwl_rewards.orientation_tracking, weight=4.0, params={"tolerance": 5.0})
     base_height_tracking = RewTerm(
         func=dwl_rewards.base_height_tracking,
-        weight=2.0,
+        weight=4.0,
         params={"target_height": 0.7, "tolerance": 10.0},
     )
     periodic_force = RewTerm(
         func=dwl_rewards.periodic_force,
-        weight=0.2,
+        weight=0.0,
         params={"gait_cfg": DwlGaitCfg(), "sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG},
     )
     periodic_velocity = RewTerm(
         func=dwl_rewards.periodic_velocity,
-        weight=0.1,
+        weight=0.0,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG},
     )
     foot_height_tracking = RewTerm(
         func=dwl_rewards.foot_height_tracking,
-        weight=0.2,
+        weight=0.0,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "tolerance": 5.0},
     )
     foot_velocity_tracking = RewTerm(
         func=dwl_rewards.foot_velocity_tracking,
-        weight=0.1,
+        weight=0.0,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "tolerance": 3.0},
     )
     default_joint_tracking = RewTerm(
         func=dwl_rewards.default_joint_tracking,
-        weight=0.5,
+        weight=1.0,
         params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG, "tolerance": 2.0},
     )
     energy_cost = RewTerm(
@@ -202,7 +213,7 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.actions.joint_pos = dwl_actions.DwlJointPositionActionCfg(
             asset_name="robot",
             joint_names=dwl_obs.CONTROLLED_LEG_JOINT_NAMES,
-            scale=0.5,
+            scale=0.25,
             use_default_offset=True,
         )
         self.actions.joint_pos.joint_names = dwl_obs.CONTROLLED_LEG_JOINT_NAMES
@@ -279,8 +290,8 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
             mode="reset",
             params={
                 "asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG,
-                "position_range": (-0.05, 0.05),
-                "velocity_range": (-0.1, 0.1),
+                "position_range": (0.0, 0.0),
+                "velocity_range": (0.0, 0.0),
             },
         )
         self.events.push_force_torques = EventTerm(
@@ -309,22 +320,23 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.rewards.dof_pos_limits = None
 
         # Commands
-        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 0.5)
+        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 0.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
-        self.commands.base_velocity.ranges.ang_vel_z = (-0.5, 0.5)
+        self.commands.base_velocity.ranges.ang_vel_z = (0.0, 0.0)
 
         # Start close to the precise G1 default pose. The stock rough task uses a
         # wide reset distribution, but large initial joint/base perturbations make
         # this biped collapse before the policy can produce a useful gait.
-        self.events.reset_base.params["pose_range"] = {"x": (-0.05, 0.05), "y": (-0.05, 0.05), "yaw": (-0.1, 0.1)}
+        self.events.reset_base.params["pose_range"] = {"x": (0.0, 0.0), "y": (0.0, 0.0), "yaw": (0.0, 0.0)}
         self.events.reset_base.params["velocity_range"] = {
-            "x": (-0.05, 0.05),
-            "y": (-0.05, 0.05),
-            "z": (-0.05, 0.05),
-            "roll": (-0.05, 0.05),
-            "pitch": (-0.05, 0.05),
-            "yaw": (-0.05, 0.05),
+            "x": (0.0, 0.0),
+            "y": (0.0, 0.0),
+            "z": (0.0, 0.0),
+            "roll": (0.0, 0.0),
+            "pitch": (0.0, 0.0),
+            "yaw": (0.0, 0.0),
         }
+        self.observations.policy.enable_corruption = False
 
         # terminations
         self.terminations.base_contact.params["sensor_cfg"].body_names = "torso_link"

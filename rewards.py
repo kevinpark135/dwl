@@ -93,6 +93,32 @@ def _action_history(env: "ManagerBasedRLEnv") -> tuple[torch.Tensor, torch.Tenso
     return action, prev_action, prev_prev_action
 
 
+def alive(env: "ManagerBasedRLEnv") -> torch.Tensor:
+    """Reward each non-terminated step equally."""
+
+    return torch.ones(_num_envs(env), device=_device(env), dtype=torch.float32)
+
+
+def base_motion_penalty(env: "ManagerBasedRLEnv", asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Penalize root linear and angular motion for stand-first training."""
+
+    asset = env.scene[asset_cfg.name]
+    lin_vel = asset.data.root_lin_vel_b.torch
+    ang_vel = asset.data.root_ang_vel_b.torch
+    return torch.sum(torch.square(lin_vel), dim=-1) + torch.sum(torch.square(ang_vel[:, :2]), dim=-1)
+
+
+def double_support(
+    env: "ManagerBasedRLEnv",
+    sensor_cfg: SceneEntityCfg = DEFAULT_CONTACT_SENSOR_CFG,
+    contact_threshold: float = 1.0,
+) -> torch.Tensor:
+    """Reward both feet being in contact for stand-first training."""
+
+    foot_contact = _foot_force_norm(env, sensor_cfg) > contact_threshold
+    return torch.all(foot_contact, dim=-1).to(dtype=torch.float32)
+
+
 def lin_velocity_tracking(
     env: "ManagerBasedRLEnv",
     command_name: str = "base_velocity",
