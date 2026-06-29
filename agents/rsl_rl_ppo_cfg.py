@@ -3,11 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""RSL-RL runner configuration for the DWL G1 task.
-
-This file starts from the existing PPO setup and will later point to the custom
-DWL model, PPO extension, and runner.
-"""
+"""RSL-RL runner configuration for the DWL G1 task."""
 
 from isaaclab.utils.configclass import configclass
 
@@ -17,7 +13,37 @@ from isaaclab_tasks.utils import preset
 
 
 @configclass
+class DwlActorModelCfg(RslRlMLPModelCfg):
+    """DWL actor with finite-history GRU encoder and decoder head."""
+
+    class_name = "DwlActorModel"
+    history_length = 5
+    encoder_hidden_dim = 128
+    encoder_num_layers = 1
+    latent_dim = 64
+    decoder_obs_set = "critic"
+    decoder_hidden_dims = [256, 128]
+
+
+@configclass
+class DwlCriticModelCfg(RslRlMLPModelCfg):
+    """DWL privileged-state critic."""
+
+    class_name = "DwlCriticModel"
+
+
+@configclass
+class DwlPpoAlgorithmCfg(RslRlPpoAlgorithmCfg):
+    """PPO with DWL reconstruction and latent regularization losses."""
+
+    class_name = "DwlPPO"
+    reconstruction_loss_coef = 1.0
+    latent_l1_loss_coef = 1.0e-3
+
+
+@configclass
 class G1DwlPPORunnerCfg(RslRlOnPolicyRunnerCfg):
+    class_name = "DwlRunner"
     num_steps_per_env = 24
     # Newton needs ~1.7x the PPO iterations to match PhysX on G1. PhysX saturates near iter 3000
     # (reward ≈ +18, ep_len ≈ 980) and does not meaningfully improve on either metric past that —
@@ -28,18 +54,19 @@ class G1DwlPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     max_iterations = preset(default=3000, newton=5000)
     save_interval = 50
     experiment_name = "g1_dwl"
-    actor = RslRlMLPModelCfg(
+    obs_groups = {"actor": ["policy"], "critic": ["privileged"]}
+    actor = DwlActorModelCfg(
         hidden_dims=[512, 256, 128],
         activation="elu",
         obs_normalization=False,
         distribution_cfg=RslRlMLPModelCfg.GaussianDistributionCfg(init_std=1.0),
     )
-    critic = RslRlMLPModelCfg(
+    critic = DwlCriticModelCfg(
         hidden_dims=[512, 256, 128],
         activation="elu",
         obs_normalization=False,
     )
-    algorithm = RslRlPpoAlgorithmCfg(
+    algorithm = DwlPpoAlgorithmCfg(
         value_loss_coef=1.0,
         use_clipped_value_loss=True,
         clip_param=0.2,

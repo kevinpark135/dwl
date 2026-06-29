@@ -48,7 +48,7 @@ dwl/
 - `events.py`: Defines DWL domain randomization buffers and event helpers for friction, pushes, mass, reset noise, motor offsets, motor strength, PD factors, observation noise bookkeeping, and system delay sampling.
 - `gait.py`: Defines gait phase, stance masks, clock inputs, and quintic foot trajectory references.
 - `agents/__init__.py`: Marks the agent configuration package.
-- `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration and will later point to the DWL custom model/algorithm/runner.
+- `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration for the DWL runner, actor, critic, PPO extension, observation groups, and auxiliary-loss weights.
 - `rsl_rl/__init__.py`: Marks the local RSL-RL extension package for DWL.
 - `rsl_rl/dwl_model.py`: RSL-RL-compatible DWL actor/critic modules with a GRU encoder, latent decoder, actor head, and privileged critic.
 - `rsl_rl/dwl_ppo.py`: RSL-RL PPO extension that adds DWL decoder reconstruction and latent L1 losses.
@@ -196,9 +196,9 @@ Implemented helpers:
 - `rsl_rl/dwl_model.py`: Feed-forward RSL-RL model surface with a finite-history GRU encoder, latent actor, decoder reconstruction head, and privileged critic.
 - `rsl_rl/dwl_ppo.py`: PPO update loop with decoder reconstruction MSE and latent L1 auxiliary losses.
 - `rsl_rl/dwl_runner.py`: RSL-RL runner integration that preserves privileged reconstruction targets through rollout storage and training.
+- `agents/rsl_rl_ppo_cfg.py`: DWL runner/model/algorithm paths, actor policy-history window, privileged critic mapping, and auxiliary loss weights.
 - `tests/`: Regression tests for gait, observation, and reward conventions.
 
 ## Remaining Implementation Order
 
-1. Update `agents/rsl_rl_ppo_cfg.py` with DWL architecture paths and paper-aligned hyperparameters.
-2. Train and compare the DWL policy against the current PPO baseline.
+1. Train and compare the DWL policy against the current PPO baseline.

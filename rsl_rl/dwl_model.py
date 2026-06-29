@@ -251,7 +251,12 @@ class DwlActorModel(nn.Module):
         decoder_obs_set: str = "critic",
         decoder_hidden_dims: tuple[int, ...] | list[int] = (256, 128),
         decoder_activation: str | None = None,
+        stochastic: Any = None,
+        init_noise_std: Any = None,
+        noise_std_type: Any = None,
+        state_dependent_std: Any = None,
     ) -> None:
+        del stochastic, init_noise_std, noise_std_type, state_dependent_std
         super().__init__()
         self.obs_groups, self.obs_dim = _selected_obs_groups(obs, obs_groups, obs_set)
         self.history_length = int(history_length)
@@ -417,9 +422,13 @@ class DwlCriticModel(nn.Module):
         activation: str = "elu",
         obs_normalization: bool = False,
         distribution_cfg: dict | None = None,
+        stochastic: Any = None,
+        init_noise_std: Any = None,
+        noise_std_type: Any = None,
+        state_dependent_std: Any = None,
     ) -> None:
         super().__init__()
-        del distribution_cfg
+        del distribution_cfg, stochastic, init_noise_std, noise_std_type, state_dependent_std
         self.obs_groups, self.obs_dim = _selected_obs_groups(obs, obs_groups, obs_set)
         self.obs_normalization = bool(obs_normalization)
         self.obs_normalizer = RunningNormalizer(self.obs_dim) if obs_normalization else nn.Identity()

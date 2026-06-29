@@ -80,6 +80,8 @@ class G1Observations:
         def __post_init__(self):
             self.enable_corruption = True
             self.concatenate_terms = True
+            self.history_length = 5
+            self.flatten_history_dim = True
 
     @configclass
     class PrivilegedCfg(ObsGroup):

@@ -10,6 +10,8 @@ def test_dwl_env_cfg_wires_policy_and_privileged_observations():
     cfg = G1DwlEnvCfg()
 
     assert cfg.observations.policy.concatenate_terms
+    assert cfg.observations.policy.history_length == 5
+    assert cfg.observations.policy.flatten_history_dim
     assert cfg.observations.privileged.concatenate_terms
     assert cfg.observations.policy.joint_pos.noise.n_min == -0.3
     assert cfg.observations.policy.joint_vel.noise.n_max == 1.0
