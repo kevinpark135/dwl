@@ -83,6 +83,7 @@ dwl/
 ├── dwl_env_cfg.py
 ├── baseline_env_cfg.py
 ├── actions.py
+├── action_terms.py
 ├── observations.py
 ├── rewards.py
 ├── events.py
@@ -108,7 +109,8 @@ Core task files:
 - `__init__.py`: Registers the DWL and baseline train/play Gym environments with Isaac Lab.
 - `dwl_env_cfg.py`: Defines the G1 DWL environment configuration by adapting the Isaac Lab rough locomotion base cfg.
 - `baseline_env_cfg.py`: Defines the proprioception-only stock PPO baseline task.
-- `actions.py`: Defines the DWL joint-position action term that consumes motor offsets and system delay.
+- `actions.py`: Defines the lightweight DWL joint-position action config and delay helper used during cfg parsing.
+- `action_terms.py`: Defines the runtime DWL joint-position action term that consumes motor offsets and system delay.
 - `observations.py`: Defines policy observations and privileged/state observations used by DWL.
 - `rewards.py`: Defines paper-specific reward terms such as velocity tracking, periodic gait rewards, foot tracking, and regularization.
 - `events.py`: Defines DWL domain randomization buffers and event helpers for friction, pushes, mass, reset noise, motor offsets, motor strength, PD factors, observation noise bookkeeping, and system delay sampling.
@@ -117,7 +119,7 @@ Core task files:
 Training configuration:
 
 - `agents/__init__.py`: Marks the agent configuration package.
-- `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration for the DWL runner and the proprioception-only baseline.
+- `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration for DWL and the proprioception-only baseline. DWL uses Isaac Lab's stock `OnPolicyRunner` entrypoint with fully-qualified custom actor, critic, and PPO class names.
 - `scripts/`: Holds baseline training pipeline
 
 RSL-RL extension files:
@@ -125,12 +127,12 @@ RSL-RL extension files:
 - `rsl_rl/__init__.py`: Marks the local RSL-RL extension package for DWL.
 - `rsl_rl/dwl_model.py`: Defines the DWL actor/critic modules with GRU history encoding, latent decoding, actor head, and privileged critic.
 - `rsl_rl/dwl_ppo.py`: Extends PPO with DWL decoder reconstruction and latent L1 losses.
-- `rsl_rl/dwl_runner.py`: Prepares DWL observation groups and validates privileged decoder targets.
+- `rsl_rl/dwl_runner.py`: Optional helper module for preparing DWL observation groups and validating privileged decoder targets. The default Isaac Lab train CLI now runs through `OnPolicyRunner`.
 
 Other:
 
 - `tests/`: Code tests.
-- `.gitignore`: Keeps local caches, logs, checkpoints, and `DWL.pdf` out of git.
+- `.gitignore`: Keeps local caches, logs, checkpoints, `DWL.pdf`, and local error-log captures out of git.
 
 ## `gait.py`
 
@@ -152,22 +154,30 @@ The file is intentionally independent from Isaac Lab manager APIs. The expected 
 - `rsl_rl/dwl_model.py` will indirectly receive these signals through the policy and privileged/state observation groups.
 - `tests/test_gait.py` keeps the gait conventions stable while observations and rewards are implemented.
 
-## `actions.py`
+## `actions.py` and `action_terms.py`
 
-`actions.py` extends Isaac Lab's joint-position action term with the DWL
-domain-randomization values sampled in `events.py`:
+The DWL action path is split into a lightweight config module and a runtime
+action-term module. This avoids importing Isaac Sim/USD runtime classes while
+Isaac Lab is only parsing task configuration.
 
 - `DwlJointPositionActionCfg`: Configures the DWL action term while preserving
-  the stock scale/default-joint-offset behavior.
-- `DwlJointPositionAction`: Stores raw action history, consumes
-  `env.dwl_system_delay_s` as a per-env bounded control-step delay, and adds
-  `env.dwl_motor_offset` to processed joint position targets.
+  the stock scale/default-joint-offset behavior. Its `class_type` points to
+  `isaaclab_tasks.manager_based.locomotion.velocity.config.dwl.action_terms:DwlJointPositionAction`
+  as a lazy fully-qualified reference.
 - `delay_steps_from_env`: Converts sampled delay seconds to integer control
   steps using `ceil(delay_s / env.step_dt)`.
+- `DwlJointPositionAction`: Runtime action term in `action_terms.py`. It stores
+  raw action history, consumes
+  `env.dwl_system_delay_s` as a per-env bounded control-step delay, and adds
+  `env.dwl_motor_offset` to processed joint position targets.
 
 The action path applies delay before action scaling/default-pose offset, then
 adds the sampled motor target offset before sending joint position targets to
 the articulation.
+
+Keeping `DwlJointPositionAction` out of `actions.py` is intentional: importing
+the runtime class too early can load `pxr`/USD modules before `SimulationApp`
+starts, which may crash Isaac Sim during startup.
 
 ## `observations.py`
 
@@ -230,7 +240,7 @@ The DWL default direction is to keep `base_lin_vel` and `height_scan` out of the
 - `default_joint_tracking`: Rewards staying near the default controlled-joint posture.
 - `energy_cost`: Computes `sum(|tau| * |qdot|)`.
 - `action_smoothness`: Computes the second-order action difference.
-- `feet_movement`: Penalizes foot velocity and acceleration.
+- `feet_movement`: Penalizes foot velocity and acceleration using Isaac Lab 3.0's `body_lin_acc_w` acceleration field.
 - `large_contact`: Penalizes excessive foot contact force.
 
 The gait helpers matter here because four rewards are phase-aware: `periodic_force`, `periodic_velocity`, `foot_height_tracking`, and `foot_velocity_tracking`. They must use the same clock, stance mask, and foot trajectory reference as the observations; otherwise the policy could observe one gait phase while rewards score another.
@@ -255,3 +265,7 @@ Event helpers:
 - `randomize_motor_offset`: Samples/stores `env.dwl_motor_offset` for action target processing.
 - `randomize_motor_strength`: Scales actuator effort limits and records `env.dwl_motor_strength`.
 - `randomize_pd_factors`: Scales actuator stiffness/damping and records `env.dwl_pd_factors`.
+
+The event helpers use Isaac Lab 3.0-compatible signatures with `env_ids` as the
+second argument. PhysX/Warp index tensors passed back into simulation APIs are
+converted to `int32`.

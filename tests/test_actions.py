@@ -5,7 +5,8 @@ from types import SimpleNamespace
 
 import torch
 
-from actions import DwlJointPositionAction, DwlJointPositionActionCfg, delay_steps_from_env
+from action_terms import DwlJointPositionAction
+from actions import DwlJointPositionActionCfg, delay_steps_from_env
 
 
 class MockAsset:

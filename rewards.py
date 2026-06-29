@@ -251,7 +251,7 @@ def feet_movement(
 
     asset = env.scene[asset_cfg.name]
     foot_vel_w = asset.data.body_link_vel_w.torch[:, asset_cfg.body_ids, :3]
-    foot_acc_w = asset.data.body_link_acc_w.torch[:, asset_cfg.body_ids, :3]
+    foot_acc_w = asset.data.body_lin_acc_w.torch[:, asset_cfg.body_ids, :3]
     return torch.sum(torch.square(foot_vel_w), dim=(-1, -2)) + torch.sum(torch.square(foot_acc_w), dim=(-1, -2))
 
 

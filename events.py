@@ -76,6 +76,12 @@ def _joint_ids_tensor(asset, asset_cfg: SceneEntityCfg, device: torch.device) ->
     return joint_ids
 
 
+def _int32_index(index: torch.Tensor | slice) -> torch.Tensor | slice:
+    if isinstance(index, slice):
+        return index
+    return index.to(dtype=torch.int32)
+
+
 def _joint_positions(requested_joint_ids: torch.Tensor, sim_joint_ids: torch.Tensor) -> torch.Tensor:
     positions = []
     for joint_id in sim_joint_ids:
@@ -222,12 +228,16 @@ def randomize_joint_reset_noise(
     joint_vel_limits = asset.data.soft_joint_vel_limits.torch[iter_env_ids, joint_ids]
     joint_vel = joint_vel.clamp_(-joint_vel_limits, joint_vel_limits)
 
-    asset.write_joint_position_to_sim_index(position=joint_pos, joint_ids=joint_ids, env_ids=ids)
-    asset.write_joint_velocity_to_sim_index(velocity=joint_vel, joint_ids=joint_ids, env_ids=ids)
+    asset.write_joint_position_to_sim_index(
+        position=joint_pos, joint_ids=_int32_index(joint_ids), env_ids=ids.to(dtype=torch.int32)
+    )
+    asset.write_joint_velocity_to_sim_index(
+        velocity=joint_vel, joint_ids=_int32_index(joint_ids), env_ids=ids.to(dtype=torch.int32)
+    )
 
 
 def randomize_joint_position_observation_noise(
-    env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None, noise_range: tuple[float, float] = (-0.3, 0.3)
+    env: "ManagerBasedEnv", env_ids: torch.Tensor | None, noise_range: tuple[float, float] = (-0.3, 0.3)
 ) -> None:
     """Record the DWL joint-position observation noise range.
 
@@ -241,7 +251,7 @@ def randomize_joint_position_observation_noise(
 
 
 def randomize_joint_velocity_observation_noise(
-    env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None, noise_range: tuple[float, float] = (-1.0, 1.0)
+    env: "ManagerBasedEnv", env_ids: torch.Tensor | None, noise_range: tuple[float, float] = (-1.0, 1.0)
 ) -> None:
     """Record the DWL joint-velocity observation noise range."""
 
@@ -251,7 +261,7 @@ def randomize_joint_velocity_observation_noise(
 
 
 def randomize_angular_velocity_observation_noise(
-    env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None, noise_range: tuple[float, float] = (-0.1, 0.1)
+    env: "ManagerBasedEnv", env_ids: torch.Tensor | None, noise_range: tuple[float, float] = (-0.1, 0.1)
 ) -> None:
     """Record the DWL angular-velocity observation noise range."""
 
@@ -261,7 +271,7 @@ def randomize_angular_velocity_observation_noise(
 
 
 def randomize_orientation_observation_noise(
-    env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None, noise_range: tuple[float, float] = (-0.1, 0.1)
+    env: "ManagerBasedEnv", env_ids: torch.Tensor | None, noise_range: tuple[float, float] = (-0.1, 0.1)
 ) -> None:
     """Record the DWL orientation observation noise range."""
 
@@ -381,8 +391,8 @@ def randomize_motor_strength(
         if isinstance(actuator, ImplicitActuator):
             asset.write_joint_effort_limit_to_sim_index(
                 limits=effort_limit[:, actuator_indices],
-                joint_ids=sim_joint_ids,
-                env_ids=ids,
+                joint_ids=sim_joint_ids.to(dtype=torch.int32),
+                env_ids=ids.to(dtype=torch.int32),
             )
 
         global_pos = _joint_positions(requested_joint_ids, sim_joint_ids)
@@ -448,13 +458,13 @@ def randomize_pd_factors(
         if isinstance(actuator, ImplicitActuator):
             asset.write_joint_stiffness_to_sim_index(
                 stiffness=stiffness[:, actuator_indices],
-                joint_ids=sim_joint_ids,
-                env_ids=ids,
+                joint_ids=sim_joint_ids.to(dtype=torch.int32),
+                env_ids=ids.to(dtype=torch.int32),
             )
             asset.write_joint_damping_to_sim_index(
                 damping=damping[:, actuator_indices],
-                joint_ids=sim_joint_ids,
-                env_ids=ids,
+                joint_ids=sim_joint_ids.to(dtype=torch.int32),
+                env_ids=ids.to(dtype=torch.int32),
             )
 
         global_pos = _joint_positions(requested_joint_ids, sim_joint_ids)

@@ -16,7 +16,7 @@ from isaaclab_tasks.utils import preset
 class DwlActorModelCfg(RslRlMLPModelCfg):
     """DWL actor with finite-history GRU encoder and decoder head."""
 
-    class_name = "DwlActorModel"
+    class_name = "isaaclab_tasks.manager_based.locomotion.velocity.config.dwl.rsl_rl.dwl_model:DwlActorModel"
     history_length = 5
     encoder_hidden_dim = 128
     encoder_num_layers = 1
@@ -29,21 +29,21 @@ class DwlActorModelCfg(RslRlMLPModelCfg):
 class DwlCriticModelCfg(RslRlMLPModelCfg):
     """DWL privileged-state critic."""
 
-    class_name = "DwlCriticModel"
+    class_name = "isaaclab_tasks.manager_based.locomotion.velocity.config.dwl.rsl_rl.dwl_model:DwlCriticModel"
 
 
 @configclass
 class DwlPpoAlgorithmCfg(RslRlPpoAlgorithmCfg):
     """PPO with DWL reconstruction and latent regularization losses."""
 
-    class_name = "DwlPPO"
+    class_name = "isaaclab_tasks.manager_based.locomotion.velocity.config.dwl.rsl_rl.dwl_ppo:DwlPPO"
     reconstruction_loss_coef = 1.0
     latent_l1_loss_coef = 1.0e-3
 
 
 @configclass
 class G1DwlPPORunnerCfg(RslRlOnPolicyRunnerCfg):
-    class_name = "DwlRunner"
+    class_name = "OnPolicyRunner"
     num_steps_per_env = 24
     # Newton needs ~1.7x the PPO iterations to match PhysX on G1. PhysX saturates near iter 3000
     # (reward ≈ +18, ep_len ≈ 980) and does not meaningfully improve on either metric past that —

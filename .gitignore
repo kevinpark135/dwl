@@ -11,4 +11,4 @@ wandb/
 *.pth
 *.ckpt
 DWL.pdf
-
+error.rtf
