@@ -38,7 +38,10 @@ def test_dwl_env_cfg_wires_dwl_events():
     assert cfg.events.init_dwl_buffers is not None
     assert cfg.events.store_friction.params["friction_range"] == (0.2, 2.0)
     assert cfg.events.physics_material.params["static_friction_range"] == (0.2, 2.0)
-    assert cfg.events.reset_robot_joints.params["position_range"] == (-0.3, 0.3)
+    assert cfg.events.reset_robot_joints.params["position_range"] == (-0.05, 0.05)
+    assert cfg.events.reset_robot_joints.params["velocity_range"] == (-0.1, 0.1)
+    assert cfg.events.reset_base.params["pose_range"]["yaw"] == (-0.1, 0.1)
+    assert cfg.events.reset_base.params["velocity_range"]["roll"] == (-0.05, 0.05)
     assert cfg.events.system_delay.params["delay_range_s"] == (0.0, 0.01)
     assert cfg.events.motor_offset.params["offset_range"] == (-0.05, 0.05)
     assert cfg.events.motor_strength.params["strength_distribution_params"] == (0.9, 1.1)
@@ -57,6 +60,10 @@ def test_play_cfg_disables_policy_noise_and_push_wrenches():
     assert cfg.events.motor_strength is None
     assert cfg.events.pd_factors is None
     assert cfg.events.add_base_mass is None
+    assert cfg.events.reset_robot_joints.params["position_range"] == (0.0, 0.0)
+    assert cfg.events.reset_robot_joints.params["velocity_range"] == (0.0, 0.0)
+    assert cfg.events.reset_base.params["pose_range"]["yaw"] == (0.0, 0.0)
+    assert cfg.events.reset_base.params["velocity_range"]["roll"] == (0.0, 0.0)
     assert cfg.events.base_external_force_torque is None
     assert cfg.events.push_force_torques is None
 

@@ -195,6 +195,8 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.commands.base_velocity.vel_yaw_success_threshold = 0.8
         # Scene
         self.scene.robot = G1_MINIMAL_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.robot.init_state.pos = (0.0, 0.0, 0.74)
+        self.scene.robot.init_state.rot = (0.0, 0.0, 0.0, 1.0)
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/torso_link"
         self.actions.joint_pos = dwl_actions.DwlJointPositionActionCfg(
             asset_name="robot",
@@ -283,8 +285,8 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
             mode="reset",
             params={
                 "asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG,
-                "position_range": (-0.3, 0.3),
-                "velocity_range": (-1.0, 1.0),
+                "position_range": (-0.05, 0.05),
+                "velocity_range": (-0.1, 0.1),
             },
         )
         self.events.push_force_torques = EventTerm(
@@ -316,6 +318,19 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.commands.base_velocity.ranges.lin_vel_x = (0.0, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
+
+        # Start close to the precise G1 default pose. The stock rough task uses a
+        # wide reset distribution, but large initial joint/base perturbations make
+        # this biped collapse before the policy can produce a useful gait.
+        self.events.reset_base.params["pose_range"] = {"x": (-0.05, 0.05), "y": (-0.05, 0.05), "yaw": (-0.1, 0.1)}
+        self.events.reset_base.params["velocity_range"] = {
+            "x": (-0.05, 0.05),
+            "y": (-0.05, 0.05),
+            "z": (-0.05, 0.05),
+            "roll": (-0.05, 0.05),
+            "pitch": (-0.05, 0.05),
+            "yaw": (-0.05, 0.05),
+        }
 
         # terminations
         self.terminations.base_contact.params["sensor_cfg"].body_names = "torso_link"
@@ -355,6 +370,17 @@ class G1DwlEnvCfg_PLAY(G1DwlEnvCfg):
         self.events.motor_strength = None
         self.events.pd_factors = None
         self.events.add_base_mass = None
+        self.events.reset_base.params["pose_range"] = {"x": (0.0, 0.0), "y": (0.0, 0.0), "yaw": (0.0, 0.0)}
+        self.events.reset_base.params["velocity_range"] = {
+            "x": (0.0, 0.0),
+            "y": (0.0, 0.0),
+            "z": (0.0, 0.0),
+            "roll": (0.0, 0.0),
+            "pitch": (0.0, 0.0),
+            "yaw": (0.0, 0.0),
+        }
+        self.events.reset_robot_joints.params["position_range"] = (0.0, 0.0)
+        self.events.reset_robot_joints.params["velocity_range"] = (0.0, 0.0)
         # remove random pushing
         self.events.base_external_force_torque = None
         self.events.push_force_torques = None
