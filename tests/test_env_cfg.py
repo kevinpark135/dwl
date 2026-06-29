@@ -26,12 +26,16 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
 
     assert isinstance(cfg.actions.joint_pos, DwlJointPositionActionCfg)
     assert cfg.actions.joint_pos.joint_names == CONTROLLED_LEG_JOINT_NAMES
-    assert cfg.actions.joint_pos.scale == 0.25
+    assert cfg.actions.joint_pos.scale == 0.5
     assert cfg.actions.joint_pos.max_delay_steps == 4
-    assert cfg.rewards.alive.weight == 1.0
-    assert cfg.rewards.double_support.weight == 2.0
-    assert cfg.rewards.lin_velocity_tracking.weight == 0.2
-    assert cfg.rewards.periodic_force.weight == 0.0
+    assert cfg.scene.robot.soft_joint_pos_limit_factor == 1.0
+    assert cfg.scene.robot.actuators["legs"].damping[".*_knee_joint"] == 12.0
+    assert cfg.scene.robot.actuators["feet"].damping == 8.0
+    assert cfg.rewards.alive.weight == 0.5
+    assert cfg.rewards.double_support.weight == 0.2
+    assert cfg.rewards.base_motion_penalty.weight == -0.05
+    assert cfg.rewards.lin_velocity_tracking.weight == 1.0
+    assert cfg.rewards.periodic_force.weight == 0.2
     assert cfg.rewards.track_lin_vel_xy_exp is None
     assert cfg.rewards.dof_torques_l2 is None
 
@@ -46,12 +50,12 @@ def test_dwl_env_cfg_wires_dwl_events():
     assert cfg.events.reset_robot_joints.params["velocity_range"] == (0.0, 0.0)
     assert cfg.events.reset_base.params["pose_range"]["yaw"] == (0.0, 0.0)
     assert cfg.events.reset_base.params["velocity_range"]["roll"] == (0.0, 0.0)
-    assert cfg.scene.terrain.max_init_terrain_level == 0
+    assert cfg.scene.terrain.max_init_terrain_level == 5
     assert cfg.rewards.feet_movement.params["acceleration_scale"] == 10.0
     assert cfg.events.system_delay.params["delay_range_s"] == (0.0, 0.0)
     assert cfg.events.motor_offset.params["offset_range"] == (0.0, 0.0)
-    assert cfg.events.motor_strength.params["strength_distribution_params"] == (0.9, 1.1)
-    assert cfg.events.pd_factors.params["pd_factor_distribution_params"] == (0.8, 1.2)
+    assert cfg.events.motor_strength.params["strength_distribution_params"] == (1.0, 1.0)
+    assert cfg.events.pd_factors.params["pd_factor_distribution_params"] == (1.0, 1.0)
     assert cfg.events.joint_position_observation_noise.params["noise_range"] == (-0.3, 0.3)
     assert cfg.events.push_force_torques is not None
     assert cfg.events.push_force_torques.params["force_range"] == (0.0, 0.0)

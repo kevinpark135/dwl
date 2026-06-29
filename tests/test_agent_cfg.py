@@ -23,7 +23,7 @@ def test_dwl_agent_cfg_points_to_dwl_runner_model_and_algorithm():
     assert cfg.actor.latent_dim == 64
     assert cfg.actor.decoder_obs_set == "critic"
     assert cfg.actor.obs_normalization
-    assert cfg.actor.distribution_cfg.init_std == 0.2
+    assert cfg.actor.distribution_cfg.init_std == 0.35
     assert cfg.critic.class_name.endswith(":DwlCriticModel")
     assert cfg.critic.obs_normalization
     assert cfg.algorithm.class_name.endswith(":DwlPPO")

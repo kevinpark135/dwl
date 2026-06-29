@@ -121,57 +121,57 @@ class G1Observations:
 class G1Rewards(RewardsCfg):
     """Reward terms for the MDP."""
 
-    alive = RewTerm(func=dwl_rewards.alive, weight=1.0)
+    alive = RewTerm(func=dwl_rewards.alive, weight=0.5)
     termination_penalty = RewTerm(func=mdp.is_terminated, weight=-100.0)
     base_motion_penalty = RewTerm(
         func=dwl_rewards.base_motion_penalty,
-        weight=-0.5,
+        weight=-0.05,
         params={"asset_cfg": dwl_obs.DEFAULT_ROBOT_CFG},
     )
     double_support = RewTerm(
         func=dwl_rewards.double_support,
-        weight=2.0,
+        weight=0.2,
         params={"sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG},
     )
     lin_velocity_tracking = RewTerm(
         func=dwl_rewards.lin_velocity_tracking,
-        weight=0.2,
+        weight=1.0,
         params={"command_name": "base_velocity", "tolerance": 5.0},
     )
     ang_velocity_tracking = RewTerm(
         func=dwl_rewards.ang_velocity_tracking,
-        weight=0.2,
+        weight=1.0,
         params={"command_name": "base_velocity", "tolerance": 7.0},
     )
-    orientation_tracking = RewTerm(func=dwl_rewards.orientation_tracking, weight=4.0, params={"tolerance": 5.0})
+    orientation_tracking = RewTerm(func=dwl_rewards.orientation_tracking, weight=3.0, params={"tolerance": 5.0})
     base_height_tracking = RewTerm(
         func=dwl_rewards.base_height_tracking,
-        weight=4.0,
+        weight=3.0,
         params={"target_height": 0.7, "tolerance": 10.0},
     )
     periodic_force = RewTerm(
         func=dwl_rewards.periodic_force,
-        weight=0.0,
+        weight=0.2,
         params={"gait_cfg": DwlGaitCfg(), "sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG},
     )
     periodic_velocity = RewTerm(
         func=dwl_rewards.periodic_velocity,
-        weight=0.0,
+        weight=0.1,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG},
     )
     foot_height_tracking = RewTerm(
         func=dwl_rewards.foot_height_tracking,
-        weight=0.0,
+        weight=0.2,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "tolerance": 5.0},
     )
     foot_velocity_tracking = RewTerm(
         func=dwl_rewards.foot_velocity_tracking,
-        weight=0.0,
+        weight=0.1,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "tolerance": 3.0},
     )
     default_joint_tracking = RewTerm(
         func=dwl_rewards.default_joint_tracking,
-        weight=1.0,
+        weight=0.5,
         params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG, "tolerance": 2.0},
     )
     energy_cost = RewTerm(
@@ -208,12 +208,34 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.scene.robot = G1_MINIMAL_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.robot.init_state.pos = (0.0, 0.0, 0.74)
         self.scene.robot.init_state.rot = (0.0, 0.0, 0.0, 1.0)
+        # Allow the policy to use the full URDF joint range when catching balance.
+        self.scene.robot.soft_joint_pos_limit_factor = 1.0
+        # Make the low-level PD less brittle on impact: keep enough stiffness to
+        # stand, but add damping so the legs/ankles can absorb the initial drop.
+        self.scene.robot.actuators["legs"].stiffness = {
+            ".*_hip_yaw_joint": 120.0,
+            ".*_hip_roll_joint": 120.0,
+            ".*_hip_pitch_joint": 160.0,
+            ".*_knee_joint": 160.0,
+            "torso_joint": 200.0,
+        }
+        self.scene.robot.actuators["legs"].damping = {
+            ".*_hip_yaw_joint": 10.0,
+            ".*_hip_roll_joint": 10.0,
+            ".*_hip_pitch_joint": 12.0,
+            ".*_knee_joint": 12.0,
+            "torso_joint": 10.0,
+        }
+        self.scene.robot.actuators["feet"].stiffness = 30.0
+        self.scene.robot.actuators["feet"].damping = 8.0
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/torso_link"
-        self.scene.terrain.max_init_terrain_level = 0
+        # Keep terrain initialization at level 5; do not lower this for future
+        # stand-up debugging unless the experiment explicitly changes terrain.
+        self.scene.terrain.max_init_terrain_level = 5
         self.actions.joint_pos = dwl_actions.DwlJointPositionActionCfg(
             asset_name="robot",
             joint_names=dwl_obs.CONTROLLED_LEG_JOINT_NAMES,
-            scale=0.25,
+            scale=0.5,
             use_default_offset=True,
         )
         self.actions.joint_pos.joint_names = dwl_obs.CONTROLLED_LEG_JOINT_NAMES
@@ -259,7 +281,7 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
             func=dwl_events.randomize_motor_strength,
             mode="startup",
             params={
-                "strength_distribution_params": (0.9, 1.1),
+                "strength_distribution_params": (1.0, 1.0),
                 "asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG,
             },
         )
@@ -267,7 +289,7 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
             func=dwl_events.randomize_pd_factors,
             mode="startup",
             params={
-                "pd_factor_distribution_params": (0.8, 1.2),
+                "pd_factor_distribution_params": (1.0, 1.0),
                 "asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG,
             },
         )
@@ -319,10 +341,11 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.rewards.flat_orientation_l2 = None
         self.rewards.dof_pos_limits = None
 
-        # Commands
-        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 0.0)
+        # Commands: keep a low-speed locomotion objective while the softened PD
+        # and full joint range handle the initial contact transient.
+        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 0.5)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
-        self.commands.base_velocity.ranges.ang_vel_z = (0.0, 0.0)
+        self.commands.base_velocity.ranges.ang_vel_z = (-0.5, 0.5)
 
         # Start close to the precise G1 default pose. The stock rough task uses a
         # wide reset distribution, but large initial joint/base perturbations make

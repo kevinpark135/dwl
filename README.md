@@ -271,9 +271,10 @@ The event helpers use Isaac Lab 3.0-compatible signatures with `env_ids` as the
 second argument. PhysX/Warp index tensors passed back into simulation APIs are
 converted to `int32`.
 
-The DWL train cfg starts terrain curriculum at `max_init_terrain_level = 0` so
-the randomly initialized policy first sees easier terrain instead of immediately
-falling on high-level rough patches.
+The DWL train cfg keeps terrain initialization at `max_init_terrain_level = 5`.
+Current stand-up debugging should not lower this value; balance fixes should
+come from reset, action, actuator, and reward settings unless the experiment is
+explicitly about terrain.
 
 ## Update Log
 
@@ -307,18 +308,26 @@ and foot velocity tracking follows the shared gait reference.
 ### First Warm-Start Attempt
 
 Reduced early training difficulty after runs showed immediate torso contact and
-zero success rate. Terrain starts at level 0, friction/randomization/pushes were
-softened, balance rewards were strengthened, and gait rewards were weakened so
-the policy was not forced into stepping before it could balance.
+zero success rate. Friction/randomization/pushes were softened, balance rewards
+were strengthened, and gait rewards were weakened so the policy was not forced
+into stepping before it could balance.
 
-### Stand-First Phase
+### Stand-First Phase Reverted
 
-Changed the current train cfg from "walk slowly" to "stand first" because the
-robot still fell before learning useful motion. Commands are fixed to zero,
-reset noise and observation corruption are disabled, action scale is reduced to
-`0.25`, initial action std is `0.2`, gait/swing rewards are temporarily off, and
-standing rewards (`alive`, `double_support`, `base_motion_penalty`) were added.
+The pure stand-only setup was removed because the intended behavior is not to
+stand forever, but to absorb spawn/contact transients and keep moving. Low-speed
+velocity commands and reduced gait rewards are active again, while standing
+rewards (`alive`, `double_support`, `base_motion_penalty`) remain only as weak
+stability aids.
+
+### Joint Range and Impact Absorption
+
+Restored terrain initialization to `max_init_terrain_level = 5` and marked it as
+fixed for future debugging. To let the robot catch itself after spawn, the G1
+soft joint position limit factor was raised to `1.0`, action scale was restored
+to `0.5`, initial action std was set to `0.35`, leg/ankle damping was increased,
+and motor strength/PD randomization was frozen at `1.0`.
 
 Next check: run a short 1024-env training job and confirm `base_contact` drops,
-episode length increases, and the robot can hold a stable upright pose before
-reintroducing command velocity or gait rewards.
+episode length increases, and the robot can survive the initial contact while
+tracking low-speed commands.
