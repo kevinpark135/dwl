@@ -16,49 +16,55 @@ All commands below are one-line commands for this machine's Isaac Lab checkout a
 Smoke-test training, small env count and tiny iteration count:
 
 ```bash
-cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 64 --max_iterations 5 --headless
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 64 --max_iterations 5 --headless
 ```
 
 Short debug training:
 
 ```bash
-cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 128 --max_iterations 50 --headless
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 128 --max_iterations 50 --headless
 ```
 
 Medium training run:
 
 ```bash
-cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 1024 --max_iterations 500 --headless
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 1024 --max_iterations 500 --headless
+```
+
+Baseline training run:
+
+```bash
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
 ```
 
 Full PhysX-style training:
 
 ```bash
-cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 1000 --headless
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 1000 --headless
 ```
 
 Long Newton-style training budget:
 
 ```bash
-cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 5000 --headless
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 5000 --headless
 ```
 
 Play latest checkpoint from `logs/rsl_rl/g1_dwl`:
 
 ```bash
-cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 32
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 32
 ```
 
 Play latest checkpoint with fewer envs:
 
 ```bash
-cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 8
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 8
 ```
 
 Play a specific checkpoint:
 
 ```bash
-cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 50 --checkpoint /home/kevinpark135/IsaacLab/logs/rsl_rl/g1_dwl/<RUN_DIR>/model_<ITER>.pt
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 50 --checkpoint /home/kevinpark135/IsaacLab/logs/rsl_rl/g1_dwl/<RUN_DIR>/model_<ITER>.pt
 ```
 
 ## File Layout
@@ -250,7 +256,3 @@ Implemented helpers:
 - `rsl_rl/dwl_runner.py`: RSL-RL runner integration that preserves privileged reconstruction targets through rollout storage and training.
 - `agents/rsl_rl_ppo_cfg.py`: DWL runner/model/algorithm paths, actor policy-history window, privileged critic mapping, and auxiliary loss weights.
 - `tests/`: Regression tests for gait, observation, and reward conventions.
-
-## Remaining Implementation Order
-
-1. Train and compare the DWL policy against the current PPO baseline.
