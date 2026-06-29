@@ -14,6 +14,7 @@ from observations import (
     make_policy_observation_terms,
     make_privileged_observation_terms,
     policy_clock,
+    policy_velocity_commands_yaw_warmup,
     quat_to_rpy,
     state_body_mass,
     state_feet_contact,
@@ -92,6 +93,20 @@ def test_policy_clock_uses_episode_time():
     env = _mock_env(num_envs=2)
 
     assert torch.allclose(policy_clock(env), torch.tensor([[0.0, 1.0], [0.0, -1.0]]), atol=1.0e-6)
+
+
+def test_policy_velocity_commands_warms_up_yaw_command():
+    env = _mock_env(num_envs=1)
+    env.command_manager = SimpleNamespace(get_command=lambda command_name: torch.tensor([[0.5, 0.0, 1.0]]))
+
+    env.common_step_counter = 0
+    assert torch.allclose(policy_velocity_commands_yaw_warmup(env, warmup_steps=10), torch.tensor([[0.5, 0.0, 0.0]]))
+
+    env.common_step_counter = 5
+    assert torch.allclose(policy_velocity_commands_yaw_warmup(env, warmup_steps=10), torch.tensor([[0.5, 0.0, 0.5]]))
+
+    env.common_step_counter = 10
+    assert torch.allclose(policy_velocity_commands_yaw_warmup(env, warmup_steps=10), torch.tensor([[0.5, 0.0, 1.0]]))
 
 
 def test_state_stance_mask_uses_episode_time():

@@ -13,11 +13,13 @@ from rewards import (
     alive,
     base_height_tracking,
     base_motion_penalty,
+    commanded_swing_air_time,
     default_joint_tracking,
     double_support,
     energy_cost,
     foot_height_tracking,
     foot_velocity_tracking,
+    forward_progress,
     large_contact,
     lin_velocity_tracking,
     periodic_force,
@@ -92,6 +94,17 @@ def test_velocity_and_height_tracking_are_one_when_at_target():
     assert torch.allclose(base_height_tracking(env), torch.ones(1))
 
 
+def test_forward_progress_rewards_commanded_positive_body_velocity():
+    env = _mock_env()
+    env.command_manager.command = torch.tensor([[0.5, 0.0, 0.0]])
+    env.scene["robot"].data.root_lin_vel_b.torch[:, 0] = 0.25
+
+    assert torch.allclose(forward_progress(env), torch.tensor([0.5]))
+
+    env.command_manager.command = torch.tensor([[0.1, 0.0, 0.0]])
+    assert torch.allclose(forward_progress(env), torch.zeros(1))
+
+
 def test_stability_rewards_ignore_commanded_horizontal_motion():
     env = _mock_env()
     sensor_cfg = SceneEntityCfg("contact_forces", body_ids=[0, 1])
@@ -118,6 +131,26 @@ def test_periodic_velocity_rewards_swing_foot_motion():
     asset_cfg = SceneEntityCfg("robot", body_ids=[0, 1])
 
     assert torch.allclose(periodic_velocity(env, asset_cfg=asset_cfg), torch.ones(1))
+
+
+def test_commanded_swing_air_time_is_gated_by_forward_command_and_rewards_touchdown():
+    env = _mock_env()
+    env.episode_length_buf[:] = 1
+    env.command_manager.command = torch.tensor([[0.5, 0.0, 0.0]])
+    env.scene["robot"].data.body_link_pose_w.torch[:, 1, 2] = 0.06
+    env.scene.sensors["contact_forces"].data.net_forces_w.torch[:, 1, 2] = 0.0
+    asset_cfg = SceneEntityCfg("robot", body_ids=[0, 1])
+    sensor_cfg = SceneEntityCfg("contact_forces", body_ids=[0, 1])
+
+    swing_reward = commanded_swing_air_time(env, asset_cfg=asset_cfg, sensor_cfg=sensor_cfg)
+    assert torch.allclose(swing_reward, torch.tensor([0.25]))
+
+    env.scene.sensors["contact_forces"].data.net_forces_w.torch[:, 1, 2] = 350.0
+    touchdown_reward = commanded_swing_air_time(env, asset_cfg=asset_cfg, sensor_cfg=sensor_cfg)
+    assert touchdown_reward.item() > 1.0
+
+    env.command_manager.command = torch.zeros(1, 3)
+    assert torch.allclose(commanded_swing_air_time(env, asset_cfg=asset_cfg, sensor_cfg=sensor_cfg), torch.zeros(1))
 
 
 def test_foot_tracking_uses_gait_references_for_swing_foot():

@@ -89,7 +89,10 @@ class G1Observations:
         """Simulation-only state used by critic and decoder targets."""
 
         clock = ObsTerm(func=dwl_obs.policy_clock, params={"gait_cfg": DwlGaitCfg()})
-        velocity_commands = ObsTerm(func=dwl_obs.policy_velocity_commands, params={"command_name": "base_velocity"})
+        velocity_commands = ObsTerm(
+            func=dwl_obs.policy_velocity_commands_yaw_warmup,
+            params={"command_name": "base_velocity", "warmup_steps": 7200},
+        )
         joint_pos = ObsTerm(func=dwl_obs.policy_joint_pos, params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG})
         joint_vel = ObsTerm(func=dwl_obs.policy_joint_vel, params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG})
         base_ang_vel = ObsTerm(func=dwl_obs.policy_base_ang_vel, params={"asset_cfg": dwl_obs.DEFAULT_ROBOT_CFG})
@@ -152,7 +155,12 @@ class G1Rewards(RewardsCfg):
     ang_velocity_tracking = RewTerm(
         func=dwl_rewards.ang_velocity_tracking,
         weight=1.5,
-        params={"command_name": "base_velocity", "tolerance": 5.0},
+        params={"command_name": "base_velocity", "tolerance": 5.0, "yaw_warmup_steps": 7200},
+    )
+    forward_progress = RewTerm(
+        func=dwl_rewards.forward_progress,
+        weight=1.0,
+        params={"command_name": "base_velocity", "min_command_x": 0.2},
     )
     orientation_tracking = RewTerm(func=dwl_rewards.orientation_tracking, weight=1.0, params={"tolerance": 5.0})
     base_height_tracking = RewTerm(
@@ -169,6 +177,20 @@ class G1Rewards(RewardsCfg):
         func=dwl_rewards.periodic_velocity,
         weight=1.0,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG},
+    )
+    commanded_swing_air_time = RewTerm(
+        func=dwl_rewards.commanded_swing_air_time,
+        weight=0.5,
+        params={
+            "command_name": "base_velocity",
+            "gait_cfg": DwlGaitCfg(),
+            "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG,
+            "sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG,
+            "min_command_x": 0.2,
+            "clearance_height": 0.06,
+            "target_air_time": 0.25,
+            "max_air_time": 0.6,
+        },
     )
     foot_height_tracking = RewTerm(
         func=dwl_rewards.foot_height_tracking,

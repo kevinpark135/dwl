@@ -197,15 +197,34 @@ def policy_velocity_commands(env: "ManagerBasedEnv", command_name: str = "base_v
     return mdp.generated_commands(env, command_name)
 
 
+def yaw_warmup_scale(env: "ManagerBasedEnv", warmup_steps: int = 7200) -> float:
+    """Return a scalar ramp for yaw commands during early training."""
+
+    if warmup_steps <= 0:
+        return 1.0
+    common_step = float(getattr(env, "common_step_counter", 0))
+    return min(max(common_step / float(warmup_steps), 0.0), 1.0)
+
+
+def policy_velocity_commands_yaw_warmup(
+    env: "ManagerBasedEnv", command_name: str = "base_velocity", warmup_steps: int = 7200
+) -> torch.Tensor:
+    """Return velocity commands with yaw gradually enabled after warmup."""
+
+    command = policy_velocity_commands(env, command_name).clone()
+    command[:, 2] = command[:, 2] * yaw_warmup_scale(env, warmup_steps)
+    return command
+
+
 def delayed_policy_velocity_commands(
-    env: "ManagerBasedEnv", command_name: str = "base_velocity", max_delay_steps: int = 4
+    env: "ManagerBasedEnv", command_name: str = "base_velocity", max_delay_steps: int = 4, yaw_warmup_steps: int = 7200
 ) -> torch.Tensor:
     """Return delayed commanded linear/yaw velocity for the policy."""
 
     return delayed_policy_observation(
         env,
         "velocity_commands",
-        policy_velocity_commands(env, command_name),
+        policy_velocity_commands_yaw_warmup(env, command_name, yaw_warmup_steps),
         max_delay_steps=max_delay_steps,
     )
 
@@ -434,7 +453,9 @@ def make_privileged_observation_terms(gait_cfg: DwlGaitCfg = DwlGaitCfg()) -> Ma
 
     return {
         "clock": ObsTerm(func=policy_clock, params={"gait_cfg": gait_cfg}),
-        "velocity_commands": ObsTerm(func=policy_velocity_commands, params={"command_name": "base_velocity"}),
+        "velocity_commands": ObsTerm(
+            func=policy_velocity_commands_yaw_warmup, params={"command_name": "base_velocity", "warmup_steps": 7200}
+        ),
         "joint_pos": ObsTerm(func=policy_joint_pos, params={"asset_cfg": DEFAULT_CONTROLLED_JOINT_CFG}),
         "joint_vel": ObsTerm(func=policy_joint_vel, params={"asset_cfg": DEFAULT_CONTROLLED_JOINT_CFG}),
         "base_ang_vel": ObsTerm(func=policy_base_ang_vel, params={"asset_cfg": DEFAULT_ROBOT_CFG}),

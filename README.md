@@ -372,6 +372,29 @@ Initial terrain difficulty was also lowered to `max_init_terrain_level = 1` so
 distance-based curriculum can promote the policy after it actually learns to
 move instead of starting on rough level 5 while stationary.
 
+### Forward Locomotion Curriculum
+
+Yaw command learning is now staged instead of fully active from the first PPO
+updates. With `num_steps_per_env = 24`, the first 300 iterations map to 7200
+policy steps, so policy yaw commands and yaw tracking are linearly ramped from
+zero to the sampled command across `yaw_warmup_steps = 7200`. The same warmed
+command is used for actor observations, privileged/critic observations, and
+`ang_velocity_tracking` so the policy and reward target do not disagree during
+the early straight-walk phase.
+
+Two forward-walking aids were added. `forward_progress` rewards positive
+body-frame x velocity only when the sampled forward command is above the
+movement threshold, and the reward is capped at the commanded speed so sprinting
+or torso-throwing cannot keep increasing the score. `commanded_swing_air_time`
+is also gated by forward command: it rewards expected swing-foot clearance,
+gives an air-time bonus on touchdown, and penalizes feet that stay airborne too
+long.
+
+The implementation keeps `orientation_tracking` and `base_height_tracking`
+enabled as low-weight guardrails so the policy cannot earn forward reward by
+falling forward. Tests were added for yaw warmup, reward wiring,
+`forward_progress`, and commanded swing air-time gating/touchdown behavior.
+
 Next check: run a short 1024-env training job and confirm `base_contact` drops,
 episode length increases, and the robot can survive the initial contact while
 tracking low-speed commands.

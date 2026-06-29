@@ -71,6 +71,21 @@ def _command_rpy_rate(env: "ManagerBasedRLEnv", command_name: str) -> torch.Tens
     return command_rpy
 
 
+def _yaw_warmup_scale(env: "ManagerBasedRLEnv", warmup_steps: int) -> float:
+    if warmup_steps <= 0:
+        return 1.0
+    common_step = float(getattr(env, "common_step_counter", 0))
+    return min(max(common_step / float(warmup_steps), 0.0), 1.0)
+
+
+def _command_rpy_rate_with_yaw_warmup(
+    env: "ManagerBasedRLEnv", command_name: str, warmup_steps: int
+) -> torch.Tensor:
+    command_rpy = _command_rpy_rate(env, command_name)
+    command_rpy[:, 2] = command_rpy[:, 2] * _yaw_warmup_scale(env, warmup_steps)
+    return command_rpy
+
+
 def _foot_force_norm(env: "ManagerBasedRLEnv", sensor_cfg: SceneEntityCfg) -> torch.Tensor:
     sensor = env.scene.sensors[sensor_cfg.name]
     forces_w = sensor.data.net_forces_w.torch[:, sensor_cfg.body_ids]
@@ -146,16 +161,34 @@ def lin_velocity_tracking_yaw_frame(
     return isaac_track_lin_vel_xy_yaw_frame_exp(env, std=std, command_name=command_name, asset_cfg=asset_cfg)
 
 
+def forward_progress(
+    env: "ManagerBasedRLEnv",
+    command_name: str = "base_velocity",
+    min_command_x: float = 0.2,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Reward positive body-frame forward velocity when forward motion is commanded."""
+
+    asset = env.scene[asset_cfg.name]
+    command_x = env.command_manager.get_command(command_name)[:, 0].clamp_min(0.0)
+    gate = (command_x > min_command_x).to(dtype=asset.data.root_lin_vel_b.torch.dtype)
+    forward_vel = asset.data.root_lin_vel_b.torch[:, 0]
+    capped_forward_vel = torch.minimum(torch.clamp(forward_vel, min=0.0), command_x)
+    return gate * capped_forward_vel / torch.clamp(command_x, min=min_command_x)
+
+
 def ang_velocity_tracking(
     env: "ManagerBasedRLEnv",
     command_name: str = "base_velocity",
     tolerance: float = 7.0,
+    yaw_warmup_steps: int = 7200,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
     """Track commanded yaw velocity while keeping roll/pitch angular velocity near zero."""
 
     asset = env.scene[asset_cfg.name]
-    return tracking_exp(asset.data.root_ang_vel_b.torch[:, :3] - _command_rpy_rate(env, command_name), tolerance)
+    command_rpy = _command_rpy_rate_with_yaw_warmup(env, command_name, yaw_warmup_steps)
+    return tracking_exp(asset.data.root_ang_vel_b.torch[:, :3] - command_rpy, tolerance)
 
 
 def orientation_tracking(
@@ -206,6 +239,70 @@ def periodic_velocity(
     _, foot_vel_w = _foot_pos_vel(env, asset_cfg)
     foot_speed = torch.clamp(torch.linalg.norm(foot_vel_w, dim=-1) / velocity_scale, min=0.0, max=1.0)
     return torch.sum((1.0 - mask) * foot_speed, dim=-1)
+
+
+def commanded_swing_air_time(
+    env: "ManagerBasedRLEnv",
+    command_name: str = "base_velocity",
+    gait_cfg: DwlGaitCfg = DwlGaitCfg(),
+    asset_cfg: SceneEntityCfg = DEFAULT_FOOT_BODY_CFG,
+    sensor_cfg: SceneEntityCfg = DEFAULT_CONTACT_SENSOR_CFG,
+    min_command_x: float = 0.2,
+    contact_threshold: float = 1.0,
+    clearance_height: float = 0.06,
+    target_air_time: float = 0.25,
+    max_air_time: float = 0.6,
+    clearance_reward_scale: float = 0.25,
+    long_air_penalty_scale: float = 0.5,
+    baseline_attr: str = "dwl_foot_height_baseline",
+    air_time_attr: str = "dwl_foot_air_time",
+    prev_contact_attr: str = "dwl_prev_foot_contact",
+) -> torch.Tensor:
+    """Reward commanded swing clearance and useful air-time, penalizing overlong flight."""
+
+    device = _device(env)
+    num_envs = _num_envs(env)
+    command_x = env.command_manager.get_command(command_name)[:, 0].clamp_min(0.0)
+    gate = (command_x > min_command_x).to(device=device, dtype=torch.float32)
+
+    foot_pos_w, _ = _foot_pos_vel(env, asset_cfg)
+    baseline = getattr(env, baseline_attr, None)
+    if baseline is None:
+        baseline = torch.zeros((num_envs, foot_pos_w.shape[1]), device=foot_pos_w.device, dtype=foot_pos_w.dtype)
+    foot_height = foot_pos_w[..., 2] - baseline
+
+    expected_swing = 1.0 - stance_mask(_episode_time_s(env), gait_cfg.cycle_time_s, gait_cfg.phase_offset)
+    clearance = torch.clamp(foot_height / clearance_height, min=0.0, max=1.0) * expected_swing
+    clearance_reward = clearance_reward_scale * torch.sum(clearance, dim=-1)
+
+    contact = _foot_force_norm(env, sensor_cfg) > contact_threshold
+    air_time = getattr(env, air_time_attr, None)
+    if air_time is None or air_time.shape != contact.shape:
+        air_time = torch.zeros(contact.shape, device=contact.device, dtype=torch.float32)
+        setattr(env, air_time_attr, air_time)
+
+    prev_contact = getattr(env, prev_contact_attr, None)
+    if prev_contact is None or prev_contact.shape != contact.shape:
+        prev_contact = contact.clone()
+        setattr(env, prev_contact_attr, prev_contact)
+
+    reset_ids = torch.nonzero(env.episode_length_buf.to(device=contact.device) == 0, as_tuple=False).flatten()
+    if reset_ids.numel() > 0:
+        air_time[reset_ids] = 0.0
+        prev_contact[reset_ids] = contact[reset_ids]
+
+    airborne = ~contact
+    first_contact = contact & (~prev_contact)
+    useful_air_time = torch.clamp(air_time / target_air_time, min=0.0, max=1.0)
+    touchdown_reward = torch.sum(first_contact.to(dtype=torch.float32) * useful_air_time, dim=-1)
+    long_air_penalty = long_air_penalty_scale * torch.sum(
+        torch.clamp(air_time - max_air_time, min=0.0) / max_air_time,
+        dim=-1,
+    )
+
+    air_time[:] = torch.where(airborne, air_time + float(env.step_dt), torch.zeros_like(air_time))
+    prev_contact[:] = contact
+    return gate * (clearance_reward + touchdown_reward - long_air_penalty)
 
 
 def foot_height_tracking(
