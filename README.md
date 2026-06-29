@@ -8,8 +8,8 @@ DWL task and environment configuration built for Isaac Lab. Copy this repository
 
 - Isaac-Velocity-DWL-G1-v0
 - Isaac-Velocity-DWL-G1-Play-v0
-- Isaac-Velocity-ProprioBaseline-G1-v0
-- Isaac-Velocity-ProprioBaseline-G1-Play-v0
+- Isaac-Velocity-DwlBaseline-G1-v0
+- Isaac-Velocity-DwlBaseline-G1-Play-v0
 
 ## Local Train/Play CLI
 
@@ -42,13 +42,13 @@ DWL full training run:
 Proprioception-only stock G1 PPO baseline without DWL-specific model, rewards, observations, domain randomization, or external height-scan policy input:
 
 ```bash
-./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-ProprioBaseline-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DwlBaseline-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
 ```
 
 Equivalent baseline wrapper script from the Isaac Lab checkout:
 
 ```bash
-source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion/velocity/config/dwl/scripts/train_proprio_baseline.sh
+source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion/velocity/config/dwl/scripts/train_baseline.sh
 ```
 
 Full PhysX-style training:
@@ -102,38 +102,40 @@ dwl/
 │   ├── dwl_ppo.py
 │   └── dwl_runner.py
 ├── scripts/
-│   └── train_proprio_baseline.sh
 ├── tests/
-│   ├── test_gait.py
-│   ├── test_events.py
-│   ├── test_env_cfg.py
-│   ├── test_observations.py
-│   └── test_rewards.py
 ├── README.md
 └── .gitignore
 ```
 
 ## File Roles
 
-- `__init__.py`: Registers the DWL train/play Gym environments with Isaac Lab.
+Core task files:
+
+- `__init__.py`: Registers the DWL and baseline train/play Gym environments with Isaac Lab.
 - `dwl_env_cfg.py`: Defines the G1 DWL environment configuration by adapting the Isaac Lab rough locomotion base cfg.
+- `baseline_env_cfg.py`: Defines the proprioception-only stock PPO baseline task.
 - `actions.py`: Defines the DWL joint-position action term that consumes motor offsets and system delay.
 - `observations.py`: Defines policy observations and privileged/state observations used by DWL.
 - `rewards.py`: Defines paper-specific reward terms such as velocity tracking, periodic gait rewards, foot tracking, and regularization.
 - `events.py`: Defines DWL domain randomization buffers and event helpers for friction, pushes, mass, reset noise, motor offsets, motor strength, PD factors, observation noise bookkeeping, and system delay sampling.
 - `gait.py`: Defines gait phase, stance masks, clock inputs, and quintic foot trajectory references.
+
+Training configuration:
+
 - `agents/__init__.py`: Marks the agent configuration package.
-- `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration for the DWL runner, actor, critic, PPO extension, observation groups, and auxiliary-loss weights.
+- `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration for the DWL runner and the proprioception-only baseline.
+- `scripts/`: Holds small local training wrappers.
+
+RSL-RL extension files:
+
 - `rsl_rl/__init__.py`: Marks the local RSL-RL extension package for DWL.
-- `rsl_rl/dwl_model.py`: RSL-RL-compatible DWL actor/critic modules with a GRU encoder, latent decoder, actor head, and privileged critic.
-- `rsl_rl/dwl_ppo.py`: RSL-RL PPO extension that adds DWL decoder reconstruction and latent L1 losses.
-- `rsl_rl/dwl_runner.py`: DWL on-policy runner that prepares observation groups and validates privileged decoder targets.
-- `tests/test_gait.py`: Regression tests for gait phase wrapping, clock inputs, stance masks, and quintic foot references.
-- `tests/test_actions.py`: Regression tests for DWL action delay and motor target offset processing.
-- `tests/test_events.py`: Regression tests for DWL event buffers, friction storage, push wrenches, mass randomization, and joint reset noise.
-- `tests/test_env_cfg.py`: Regression tests for wiring observations, rewards, events, and action joints into `dwl_env_cfg.py`.
-- `tests/test_observations.py`: Regression tests for DWL observation helper conventions such as quaternion-to-RPY orientation.
-- `tests/test_rewards.py`: Regression tests for DWL reward kernels, phase-aware rewards, foot tracking, and regularization terms.
+- `rsl_rl/dwl_model.py`: Defines the DWL actor/critic modules with GRU history encoding, latent decoding, actor head, and privileged critic.
+- `rsl_rl/dwl_ppo.py`: Extends PPO with DWL decoder reconstruction and latent L1 losses.
+- `rsl_rl/dwl_runner.py`: Prepares DWL observation groups and validates privileged decoder targets.
+
+Other:
+
+- `tests/`: Code tests.
 - `.gitignore`: Keeps local caches, logs, checkpoints, and `DWL.pdf` out of git.
 
 ## `gait.py`
@@ -243,7 +245,7 @@ The gait helpers matter here because four rewards are phase-aware: `periodic_for
 
 `events.py` maps the DWL paper domain-randomization table into named Isaac Lab event hooks and privileged buffers.
 
-Implemented helpers:
+Event helpers:
 
 - `init_dwl_event_buffers`: Creates buffers consumed by privileged observations.
 - `clear_push_force_torques`: Clears the stored external wrench buffer.
@@ -259,17 +261,3 @@ Implemented helpers:
 - `randomize_motor_offset`: Samples/stores `env.dwl_motor_offset` for action target processing.
 - `randomize_motor_strength`: Scales actuator effort limits and records `env.dwl_motor_strength`.
 - `randomize_pd_factors`: Scales actuator stiffness/damping and records `env.dwl_pd_factors`.
-
-## Implemented
-
-- `gait.py`: Clock signals, stance masks, phase offsets, and quintic foot trajectory helpers.
-- `actions.py`: DWL action term consuming motor offsets and system delay.
-- `observations.py`: Policy and privileged/state observation term functions.
-- `rewards.py`: DWL paper reward table terms using the shared gait helpers.
-- `events.py`: DWL DR buffers and all paper-named domain randomization event helpers.
-- `dwl_env_cfg.py`: Wires DWL observations, rewards, event helpers, observation noise, and 12-DoF leg actions into the G1 task.
-- `rsl_rl/dwl_model.py`: Feed-forward RSL-RL model surface with a finite-history GRU encoder, latent actor, decoder reconstruction head, and privileged critic.
-- `rsl_rl/dwl_ppo.py`: PPO update loop with decoder reconstruction MSE and latent L1 auxiliary losses.
-- `rsl_rl/dwl_runner.py`: RSL-RL runner integration that preserves privileged reconstruction targets through rollout storage and training.
-- `agents/rsl_rl_ppo_cfg.py`: DWL runner/model/algorithm paths, actor policy-history window, privileged critic mapping, and auxiliary loss weights.
-- `tests/`: Regression tests for gait, observation, and reward conventions.
