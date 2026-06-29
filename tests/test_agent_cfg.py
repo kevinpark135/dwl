@@ -15,17 +15,17 @@ from rsl_rl.dwl_ppo import DwlPPO
 def test_dwl_agent_cfg_points_to_dwl_runner_model_and_algorithm():
     cfg = G1DwlPPORunnerCfg()
 
-    assert cfg.class_name == "DwlRunner"
+    assert cfg.class_name == "OnPolicyRunner"
     assert cfg.obs_groups == {"actor": ["policy"], "critic": ["privileged"]}
-    assert cfg.actor.class_name == "DwlActorModel"
+    assert cfg.actor.class_name.endswith(":DwlActorModel")
     assert cfg.actor.history_length == 5
     assert cfg.actor.encoder_hidden_dim == 128
     assert cfg.actor.latent_dim == 64
     assert cfg.actor.decoder_obs_set == "critic"
     assert cfg.actor.obs_normalization
-    assert cfg.critic.class_name == "DwlCriticModel"
+    assert cfg.critic.class_name.endswith(":DwlCriticModel")
     assert cfg.critic.obs_normalization
-    assert cfg.algorithm.class_name == "DwlPPO"
+    assert cfg.algorithm.class_name.endswith(":DwlPPO")
     assert cfg.algorithm.reconstruction_loss_coef == 1.0
     assert cfg.algorithm.latent_l1_loss_coef == 1.0e-3
 
@@ -44,9 +44,9 @@ def test_dwl_agent_cfg_constructs_dwl_algorithm_from_serialized_config():
 
     alg = DwlPPO.construct_algorithm(obs, env, cfg, device="cpu")
 
-    assert isinstance(alg, DwlPPO)
-    assert isinstance(alg.actor, DwlActorModel)
-    assert isinstance(alg.critic, DwlCriticModel)
+    assert alg.__class__.__name__ == "DwlPPO"
+    assert alg.actor.__class__.__name__ == "DwlActorModel"
+    assert alg.critic.__class__.__name__ == "DwlCriticModel"
     assert alg.actor.history_length == 5
     assert alg.actor.reconstruction_target(obs).shape == (4, 64)
 

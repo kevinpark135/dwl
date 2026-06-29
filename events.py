@@ -237,7 +237,7 @@ def randomize_joint_reset_noise(
 
 
 def randomize_joint_position_observation_noise(
-    env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None, noise_range: tuple[float, float] = (-0.3, 0.3)
+    env: "ManagerBasedEnv", env_ids: torch.Tensor | None, noise_range: tuple[float, float] = (-0.3, 0.3)
 ) -> None:
     """Record the DWL joint-position observation noise range.
 
@@ -251,7 +251,7 @@ def randomize_joint_position_observation_noise(
 
 
 def randomize_joint_velocity_observation_noise(
-    env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None, noise_range: tuple[float, float] = (-1.0, 1.0)
+    env: "ManagerBasedEnv", env_ids: torch.Tensor | None, noise_range: tuple[float, float] = (-1.0, 1.0)
 ) -> None:
     """Record the DWL joint-velocity observation noise range."""
 
@@ -261,7 +261,7 @@ def randomize_joint_velocity_observation_noise(
 
 
 def randomize_angular_velocity_observation_noise(
-    env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None, noise_range: tuple[float, float] = (-0.1, 0.1)
+    env: "ManagerBasedEnv", env_ids: torch.Tensor | None, noise_range: tuple[float, float] = (-0.1, 0.1)
 ) -> None:
     """Record the DWL angular-velocity observation noise range."""
 
@@ -271,7 +271,7 @@ def randomize_angular_velocity_observation_noise(
 
 
 def randomize_orientation_observation_noise(
-    env: "ManagerBasedEnv", env_ids: torch.Tensor | None = None, noise_range: tuple[float, float] = (-0.1, 0.1)
+    env: "ManagerBasedEnv", env_ids: torch.Tensor | None, noise_range: tuple[float, float] = (-0.1, 0.1)
 ) -> None:
     """Record the DWL orientation observation noise range."""
 

@@ -152,7 +152,7 @@ def test_randomize_joint_reset_noise_writes_clamped_joint_state():
 def test_observation_noise_events_record_ranges():
     env = _mock_env()
 
-    randomize_joint_position_observation_noise(env, noise_range=(-0.2, 0.2))
+    randomize_joint_position_observation_noise(env, None, noise_range=(-0.2, 0.2))
 
     assert getattr(env, DWL_OBSERVATION_NOISE_RANGES_ATTR)["joint_position"] == (-0.2, 0.2)
 

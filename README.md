@@ -119,7 +119,7 @@ Core task files:
 Training configuration:
 
 - `agents/__init__.py`: Marks the agent configuration package.
-- `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration for DWL and the proprioception-only baseline. DWL uses the custom `DwlRunner` with local `DwlActorModel`, `DwlCriticModel`, and `DwlPPO` class names.
+- `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration for DWL and the proprioception-only baseline. DWL uses Isaac Lab's `OnPolicyRunner` with fully-qualified custom `DwlActorModel`, `DwlCriticModel`, and `DwlPPO` class names.
 - `scripts/`: Holds baseline training pipeline
 
 RSL-RL extension files:
@@ -127,7 +127,7 @@ RSL-RL extension files:
 - `rsl_rl/__init__.py`: Marks the local RSL-RL extension package for DWL.
 - `rsl_rl/dwl_model.py`: Defines the DWL actor/critic modules with GRU history encoding, latent decoding, actor head, and privileged critic.
 - `rsl_rl/dwl_ppo.py`: Extends PPO with DWL decoder reconstruction and latent L1 losses.
-- `rsl_rl/dwl_runner.py`: Custom runner for preparing DWL observation groups and validating privileged decoder targets. The default DWL train cfg now runs through `DwlRunner`.
+- `rsl_rl/dwl_runner.py`: Helper runner for preparing DWL observation groups and validating privileged decoder targets. The default Isaac Lab train CLI currently runs through `OnPolicyRunner`.
 
 Other:
 
@@ -312,11 +312,11 @@ observations use history and delay buffers, while privileged observations remain
 immediate critic/decoder targets.
 
 The custom `DwlRunner` was added to preserve and validate decoder target
-observations during rollout. A later cfg audit found the train config had drifted
-back toward `OnPolicyRunner` and long package-path class names, so the runner cfg
-was corrected to use `DwlRunner`, `DwlActorModel`, `DwlCriticModel`, and
-`DwlPPO` directly. Actor and critic observation normalization were also enabled
-to improve early PPO conditioning.
+observations during rollout experiments. The current Isaac Lab train entrypoint
+only supports `OnPolicyRunner` and `DistillationRunner`, so the production train
+cfg uses `OnPolicyRunner` with fully-qualified `DwlActorModel`,
+`DwlCriticModel`, and `DwlPPO` class names. Actor and critic observation
+normalization were enabled to improve early PPO conditioning.
 
 ### Isaac Lab 3.0 Compatibility and Reward Corrections
 
@@ -330,8 +330,8 @@ Several fixes came from Isaac Lab 3.0 API mismatches and unstable reward scales:
   `10.0` before squaring so SI-unit accelerations do not dominate early learning.
 - Foot velocity tracking was fixed so the swing-foot vertical velocity reward
   matches the shared gait reference instead of silently scoring the wrong motion.
-- Observation-noise event helpers now accept `env_ids=None`, which keeps them
-  compatible with Isaac Lab event hooks and direct debug/test calls.
+- Observation-noise event helpers keep `env_ids` as a required second argument
+  so Isaac Lab's `EventManager` accepts them during startup validation.
 
 ### Initial Pose and Terrain Curriculum
 
