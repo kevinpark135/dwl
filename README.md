@@ -240,7 +240,7 @@ The DWL default direction is to keep `base_lin_vel` and `height_scan` out of the
 - `default_joint_tracking`: Rewards staying near the default controlled-joint posture.
 - `energy_cost`: Computes `sum(|tau| * |qdot|)`.
 - `action_smoothness`: Computes the second-order action difference.
-- `feet_movement`: Penalizes foot velocity and acceleration using Isaac Lab 3.0's `body_lin_acc_w` acceleration field.
+- `feet_movement`: Penalizes vertical foot velocity and acceleration (`z` axis only) using Isaac Lab 3.0's `body_lin_acc_w` acceleration field.
 - `large_contact`: Penalizes excessive foot contact force.
 
 The gait helpers matter here because four rewards are phase-aware: `periodic_force`, `periodic_velocity`, `foot_height_tracking`, and `foot_velocity_tracking`. They must use the same clock, stance mask, and foot trajectory reference as the observations; otherwise the policy could observe one gait phase while rewards score another.

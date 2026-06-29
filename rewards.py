@@ -247,12 +247,12 @@ def action_smoothness(env: "ManagerBasedRLEnv") -> torch.Tensor:
 def feet_movement(
     env: "ManagerBasedRLEnv", asset_cfg: SceneEntityCfg = DEFAULT_FOOT_BODY_CFG
 ) -> torch.Tensor:
-    """Return foot velocity/acceleration regularization term."""
+    """Return vertical foot velocity/acceleration regularization term."""
 
     asset = env.scene[asset_cfg.name]
-    foot_vel_w = asset.data.body_link_vel_w.torch[:, asset_cfg.body_ids, :3]
-    foot_acc_w = asset.data.body_lin_acc_w.torch[:, asset_cfg.body_ids, :3]
-    return torch.sum(torch.square(foot_vel_w), dim=(-1, -2)) + torch.sum(torch.square(foot_acc_w), dim=(-1, -2))
+    foot_vel_z = asset.data.body_link_vel_w.torch[:, asset_cfg.body_ids, 2]
+    foot_acc_z = asset.data.body_lin_acc_w.torch[:, asset_cfg.body_ids, 2]
+    return torch.sum(torch.square(foot_vel_z) + torch.square(foot_acc_z), dim=-1)
 
 
 def large_contact(

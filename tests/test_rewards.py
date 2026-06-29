@@ -19,6 +19,7 @@ from rewards import (
     lin_velocity_tracking,
     periodic_force,
     periodic_velocity,
+    feet_movement,
     tracking_exp,
 )
 
@@ -56,7 +57,7 @@ def _mock_env(num_envs=1):
             root_pos_w=SimpleNamespace(torch=torch.tensor([[0.0, 0.0, 0.7]]).repeat(num_envs, 1)),
             body_link_pose_w=SimpleNamespace(torch=torch.zeros(num_envs, 2, 7)),
             body_link_vel_w=SimpleNamespace(torch=torch.zeros(num_envs, 2, 6)),
-            body_link_acc_w=SimpleNamespace(torch=torch.zeros(num_envs, 2, 6)),
+            body_lin_acc_w=SimpleNamespace(torch=torch.zeros(num_envs, 2, 6)),
             joint_pos=SimpleNamespace(torch=torch.zeros(num_envs, 2)),
             default_joint_pos=SimpleNamespace(torch=torch.zeros(num_envs, 2)),
             joint_vel=SimpleNamespace(torch=torch.ones(num_envs, 2)),
@@ -123,6 +124,17 @@ def test_regularization_terms_return_expected_costs():
     assert torch.allclose(default_joint_tracking(env, asset_cfg=asset_cfg), torch.ones(1))
     assert torch.allclose(energy_cost(env, asset_cfg=asset_cfg), torch.tensor([4.0]))
     assert torch.allclose(action_smoothness(env), torch.tensor([5.0]))
+
+
+def test_feet_movement_penalizes_only_vertical_foot_motion():
+    env = _mock_env()
+    env.scene["robot"].data.body_link_vel_w.torch[:, 0, 0] = 10.0
+    env.scene["robot"].data.body_lin_acc_w.torch[:, 0, 1] = 20.0
+    env.scene["robot"].data.body_link_vel_w.torch[:, :, 2] = torch.tensor([[1.0, 2.0]])
+    env.scene["robot"].data.body_lin_acc_w.torch[:, :, 2] = torch.tensor([[3.0, 4.0]])
+    asset_cfg = SceneEntityCfg("robot", body_ids=[0, 1])
+
+    assert torch.allclose(feet_movement(env, asset_cfg=asset_cfg), torch.tensor([30.0]))
 
 
 def test_large_contact_penalizes_force_above_threshold():
