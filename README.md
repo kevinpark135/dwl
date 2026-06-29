@@ -45,12 +45,6 @@ Proprioception-only stock G1 PPO baseline without DWL-specific model, rewards, o
 ./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DwlBaseline-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
 ```
 
-Equivalent baseline wrapper script from the Isaac Lab checkout:
-
-```bash
-source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion/velocity/config/dwl/scripts/train_baseline.sh
-```
-
 Full PhysX-style training:
 
 ```bash
@@ -124,7 +118,7 @@ Training configuration:
 
 - `agents/__init__.py`: Marks the agent configuration package.
 - `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration for the DWL runner and the proprioception-only baseline.
-- `scripts/`: Holds small local training wrappers.
+- `scripts/`: Holds baseline training pipeline
 
 RSL-RL extension files:
 
