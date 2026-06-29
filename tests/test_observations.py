@@ -10,6 +10,7 @@ from isaaclab.managers import SceneEntityCfg
 
 from observations import (
     base_orientation_rpy,
+    delayed_policy_observation,
     make_policy_observation_terms,
     make_privileged_observation_terms,
     policy_clock,
@@ -33,6 +34,7 @@ def _mock_env(num_envs=2):
         num_envs=num_envs,
         device=torch.device("cpu"),
         step_dt=0.5,
+        common_step_counter=0,
         episode_length_buf=episode_length_buf,
         scene=MockScene(),
     )
@@ -150,3 +152,24 @@ def test_observation_term_factories_include_expected_terms():
         "joint_torques",
         "height_scan",
     }
+
+
+def test_delayed_policy_observation_uses_per_env_system_delay():
+    env = _mock_env(num_envs=2)
+    env.dwl_system_delay_s = torch.tensor([[0.5], [1.0]])
+
+    obs = delayed_policy_observation(env, "test", torch.tensor([[1.0], [10.0]]), max_delay_steps=2)
+    assert torch.allclose(obs, torch.tensor([[1.0], [10.0]]))
+
+    env.common_step_counter = 1
+    env.episode_length_buf += 1
+    obs = delayed_policy_observation(env, "test", torch.tensor([[2.0], [20.0]]), max_delay_steps=2)
+    assert torch.allclose(obs, torch.tensor([[1.0], [10.0]]))
+
+    repeated_obs = delayed_policy_observation(env, "test", torch.tensor([[99.0], [99.0]]), max_delay_steps=2)
+    assert torch.allclose(repeated_obs, torch.tensor([[1.0], [10.0]]))
+
+    env.common_step_counter = 2
+    env.episode_length_buf += 1
+    obs = delayed_policy_observation(env, "test", torch.tensor([[3.0], [30.0]]), max_delay_steps=2)
+    assert torch.allclose(obs, torch.tensor([[2.0], [10.0]]))

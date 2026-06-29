@@ -1,6 +1,7 @@
 # Copyright (c) 2022-2026, The Isaac Lab Project Developers.
 # SPDX-License-Identifier: BSD-3-Clause
 
+from actions import DwlJointPositionActionCfg
 from dwl_env_cfg import G1DwlEnvCfg, G1DwlEnvCfg_PLAY
 from observations import CONTROLLED_LEG_JOINT_NAMES
 
@@ -19,7 +20,9 @@ def test_dwl_env_cfg_wires_policy_and_privileged_observations():
 def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
     cfg = G1DwlEnvCfg()
 
+    assert isinstance(cfg.actions.joint_pos, DwlJointPositionActionCfg)
     assert cfg.actions.joint_pos.joint_names == CONTROLLED_LEG_JOINT_NAMES
+    assert cfg.actions.joint_pos.max_delay_steps == 4
     assert cfg.rewards.lin_velocity_tracking.weight == 1.0
     assert cfg.rewards.periodic_force.weight == 1.0
     assert cfg.rewards.track_lin_vel_xy_exp is None

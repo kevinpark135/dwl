@@ -25,11 +25,13 @@ from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import (
 )
 
 try:
+    from . import actions as dwl_actions
     from . import events as dwl_events
     from . import observations as dwl_obs
     from . import rewards as dwl_rewards
     from .gait import DwlGaitCfg
 except ImportError:
+    import actions as dwl_actions
     import events as dwl_events
     import observations as dwl_obs
     import rewards as dwl_rewards
@@ -49,29 +51,31 @@ class G1Observations:
     class PolicyCfg(ObsGroup):
         """Onboard observations used by actor/encoder."""
 
-        clock = ObsTerm(func=dwl_obs.policy_clock, params={"gait_cfg": DwlGaitCfg()})
-        velocity_commands = ObsTerm(func=dwl_obs.policy_velocity_commands, params={"command_name": "base_velocity"})
+        clock = ObsTerm(func=dwl_obs.delayed_policy_clock, params={"gait_cfg": DwlGaitCfg()})
+        velocity_commands = ObsTerm(
+            func=dwl_obs.delayed_policy_velocity_commands, params={"command_name": "base_velocity"}
+        )
         joint_pos = ObsTerm(
-            func=dwl_obs.policy_joint_pos,
+            func=dwl_obs.delayed_policy_joint_pos,
             params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG},
             noise=Unoise(n_min=-0.3, n_max=0.3),
         )
         joint_vel = ObsTerm(
-            func=dwl_obs.policy_joint_vel,
+            func=dwl_obs.delayed_policy_joint_vel,
             params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG},
             noise=Unoise(n_min=-1.0, n_max=1.0),
         )
         base_ang_vel = ObsTerm(
-            func=dwl_obs.policy_base_ang_vel,
+            func=dwl_obs.delayed_policy_base_ang_vel,
             params={"asset_cfg": dwl_obs.DEFAULT_ROBOT_CFG},
             noise=Unoise(n_min=-0.1, n_max=0.1),
         )
         base_orientation = ObsTerm(
-            func=dwl_obs.policy_base_orientation,
+            func=dwl_obs.delayed_policy_base_orientation,
             params={"asset_cfg": dwl_obs.DEFAULT_ROBOT_CFG},
             noise=Unoise(n_min=-0.1, n_max=0.1),
         )
-        last_action = ObsTerm(func=dwl_obs.policy_last_action)
+        last_action = ObsTerm(func=dwl_obs.delayed_policy_last_action)
 
         def __post_init__(self):
             self.enable_corruption = True
@@ -190,6 +194,12 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         # Scene
         self.scene.robot = G1_MINIMAL_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/torso_link"
+        self.actions.joint_pos = dwl_actions.DwlJointPositionActionCfg(
+            asset_name="robot",
+            joint_names=dwl_obs.CONTROLLED_LEG_JOINT_NAMES,
+            scale=0.5,
+            use_default_offset=True,
+        )
         self.actions.joint_pos.joint_names = dwl_obs.CONTROLLED_LEG_JOINT_NAMES
 
         # DWL events and privileged buffers

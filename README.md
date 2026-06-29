@@ -15,6 +15,7 @@ DWL task and environment configuration built for Isaac Lab. Copy this repository
 dwl/
 ├── __init__.py
 ├── dwl_env_cfg.py
+├── actions.py
 ├── observations.py
 ├── rewards.py
 ├── events.py
@@ -41,6 +42,7 @@ dwl/
 
 - `__init__.py`: Registers the DWL train/play Gym environments with Isaac Lab.
 - `dwl_env_cfg.py`: Defines the G1 DWL environment configuration by adapting the Isaac Lab rough locomotion base cfg.
+- `actions.py`: Defines the DWL joint-position action term that consumes motor offsets and system delay.
 - `observations.py`: Defines policy observations and privileged/state observations used by DWL.
 - `rewards.py`: Defines paper-specific reward terms such as velocity tracking, periodic gait rewards, foot tracking, and regularization.
 - `events.py`: Defines DWL domain randomization buffers and event helpers for friction, pushes, mass, reset noise, motor offsets, motor strength, PD factors, observation noise bookkeeping, and system delay sampling.
@@ -52,6 +54,7 @@ dwl/
 - `rsl_rl/dwl_ppo.py`: Placeholder for PPO with DWL denoising and latent regularization losses.
 - `rsl_rl/dwl_runner.py`: Placeholder for the runner that wires Isaac Lab observation groups into the DWL training loop.
 - `tests/test_gait.py`: Regression tests for gait phase wrapping, clock inputs, stance masks, and quintic foot references.
+- `tests/test_actions.py`: Regression tests for DWL action delay and motor target offset processing.
 - `tests/test_events.py`: Regression tests for DWL event buffers, friction storage, push wrenches, mass randomization, and joint reset noise.
 - `tests/test_env_cfg.py`: Regression tests for wiring observations, rewards, events, and action joints into `dwl_env_cfg.py`.
 - `tests/test_observations.py`: Regression tests for DWL observation helper conventions such as quaternion-to-RPY orientation.
@@ -78,6 +81,23 @@ The file is intentionally independent from Isaac Lab manager APIs. The expected 
 - `rsl_rl/dwl_model.py` will indirectly receive these signals through the policy and privileged/state observation groups.
 - `tests/test_gait.py` keeps the gait conventions stable while observations and rewards are implemented.
 
+## `actions.py`
+
+`actions.py` extends Isaac Lab's joint-position action term with the DWL
+domain-randomization values sampled in `events.py`:
+
+- `DwlJointPositionActionCfg`: Configures the DWL action term while preserving
+  the stock scale/default-joint-offset behavior.
+- `DwlJointPositionAction`: Stores raw action history, consumes
+  `env.dwl_system_delay_s` as a per-env bounded control-step delay, and adds
+  `env.dwl_motor_offset` to processed joint position targets.
+- `delay_steps_from_env`: Converts sampled delay seconds to integer control
+  steps using `ceil(delay_s / env.step_dt)`.
+
+The action path applies delay before action scaling/default-pose offset, then
+adds the sampled motor target offset before sending joint position targets to
+the articulation.
+
 ## `observations.py`
 
 `observations.py` defines the DWL policy and privileged/state observation terms. The policy group is restricted to signals that should be available on the real robot, while the privileged/state group contains simulation-only information for the critic and decoder target.
@@ -91,6 +111,11 @@ Policy terms:
 - `policy_base_ang_vel`: Base angular velocity.
 - `policy_base_orientation`: Paper-aligned base orientation as RPY.
 - `policy_last_action`: Previous action.
+
+The policy terms wired by `dwl_env_cfg.py` use delayed variants of these
+functions. Each delayed policy term keeps a per-term history buffer, consumes
+`env.dwl_system_delay_s`, and returns the per-env delayed signal. Privileged
+state terms remain immediate simulator state for the critic/decoder target.
 
 Privileged/state terms:
 
@@ -155,7 +180,7 @@ Implemented helpers:
 - `randomize_joint_velocity_observation_noise`: Records the paper noise range; actual noise is applied by `ObservationTermCfg.noise`.
 - `randomize_angular_velocity_observation_noise`: Records the paper noise range; actual noise is applied by `ObservationTermCfg.noise`.
 - `randomize_orientation_observation_noise`: Records the paper noise range; actual noise is applied by `ObservationTermCfg.noise`.
-- `randomize_system_delay`: Samples/stores `env.dwl_system_delay_s` for future action/observation delay buffers.
+- `randomize_system_delay`: Samples/stores `env.dwl_system_delay_s` for action and policy-observation delay buffers.
 - `randomize_motor_offset`: Samples/stores `env.dwl_motor_offset` for action target processing.
 - `randomize_motor_strength`: Scales actuator effort limits and records `env.dwl_motor_strength`.
 - `randomize_pd_factors`: Scales actuator stiffness/damping and records `env.dwl_pd_factors`.
@@ -163,6 +188,7 @@ Implemented helpers:
 ## Implemented
 
 - `gait.py`: Clock signals, stance masks, phase offsets, and quintic foot trajectory helpers.
+- `actions.py`: DWL action term consuming motor offsets and system delay.
 - `observations.py`: Policy and privileged/state observation term functions.
 - `rewards.py`: DWL paper reward table terms using the shared gait helpers.
 - `events.py`: DWL DR buffers and all paper-named domain randomization event helpers.
@@ -171,9 +197,8 @@ Implemented helpers:
 
 ## Remaining Implementation Order
 
-1. Consume `env.dwl_motor_offset` and `env.dwl_system_delay_s` in the action/observation pipeline.
-2. Implement `rsl_rl/dwl_model.py` with the encoder, decoder, actor, and critic.
-3. Implement `rsl_rl/dwl_ppo.py` by adding reconstruction and latent L1 losses to PPO.
-4. Implement `rsl_rl/dwl_runner.py` to pass privileged reconstruction targets through rollout and training.
-5. Update `agents/rsl_rl_ppo_cfg.py` with DWL architecture paths and paper-aligned hyperparameters.
-6. Train and compare the DWL policy against the current PPO baseline.
+1. Implement `rsl_rl/dwl_model.py` with the encoder, decoder, actor, and critic.
+2. Implement `rsl_rl/dwl_ppo.py` by adding reconstruction and latent L1 losses to PPO.
+3. Implement `rsl_rl/dwl_runner.py` to pass privileged reconstruction targets through rollout and training.
+4. Update `agents/rsl_rl_ppo_cfg.py` with DWL architecture paths and paper-aligned hyperparameters.
+5. Train and compare the DWL policy against the current PPO baseline.

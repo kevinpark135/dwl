@@ -27,8 +27,10 @@ from isaaclab.utils.math import euler_xyz_from_quat
 import isaaclab_tasks.manager_based.locomotion.velocity.mdp as mdp
 
 try:
+    from .actions import delay_steps_from_env
     from .gait import DwlGaitCfg, clock_input, stance_mask
 except ImportError:
+    from actions import delay_steps_from_env
     from gait import DwlGaitCfg, clock_input, stance_mask
 
 if TYPE_CHECKING:
@@ -53,6 +55,8 @@ DEFAULT_CONTROLLED_JOINT_CFG = SceneEntityCfg("robot", joint_names=CONTROLLED_LE
 DEFAULT_FOOT_BODY_CFG = SceneEntityCfg("robot", body_names=FOOT_BODY_NAMES)
 DEFAULT_CONTACT_SENSOR_CFG = SceneEntityCfg("contact_forces", body_names=FOOT_BODY_NAMES)
 DEFAULT_HEIGHT_SCAN_CFG = SceneEntityCfg("height_scanner")
+DWL_OBSERVATION_DELAY_BUFFERS_ATTR = "dwl_observation_delay_buffers"
+DWL_SYSTEM_DELAY_ATTR = "dwl_system_delay_s"
 
 
 def _episode_time_s(env: "ManagerBasedEnv") -> torch.Tensor:
@@ -96,6 +100,59 @@ def _optional_env_tensor(
     return tensor.reshape(_num_envs(env), width)
 
 
+def delayed_policy_observation(
+    env: "ManagerBasedEnv",
+    term_name: str,
+    obs: torch.Tensor,
+    max_delay_steps: int = 4,
+    delay_attr_name: str = DWL_SYSTEM_DELAY_ATTR,
+) -> torch.Tensor:
+    """Return a per-env delayed policy observation sample.
+
+    The helper appends at most once per `env.common_step_counter` for each term
+    so repeated observation-manager reads during the same step do not advance
+    the delay buffer.
+    """
+
+    if max_delay_steps <= 0:
+        return obs
+
+    num_envs = _num_envs(env)
+    device = obs.device
+    obs = obs.reshape(num_envs, -1)
+    buffers = getattr(env, DWL_OBSERVATION_DELAY_BUFFERS_ATTR, None)
+    if buffers is None:
+        buffers = {}
+        setattr(env, DWL_OBSERVATION_DELAY_BUFFERS_ATTR, buffers)
+
+    history_len = max_delay_steps + 1
+    state = buffers.get(term_name)
+    expected_shape = (num_envs, history_len, obs.shape[1])
+    if state is None or state["history"].shape != expected_shape:
+        history = obs.unsqueeze(1).repeat(1, history_len, 1).clone()
+        state = {
+            "history": history,
+            "index": 0,
+            "last_step": None,
+        }
+        buffers[term_name] = state
+
+    common_step = int(getattr(env, "common_step_counter", int(_episode_time_s(env).max().item())))
+    if state["last_step"] != common_step:
+        state["index"] = (state["index"] + 1) % history_len
+        state["history"][:, state["index"]] = obs
+        state["last_step"] = common_step
+
+    reset_ids = torch.nonzero(env.episode_length_buf.to(device=device) == 0, as_tuple=False).flatten()
+    if reset_ids.numel() > 0:
+        state["history"][reset_ids] = obs[reset_ids].unsqueeze(1)
+
+    delay_steps = delay_steps_from_env(env, max_delay_steps, delay_attr_name).to(device=device)
+    history_ids = (state["index"] - delay_steps) % history_len
+    env_ids = torch.arange(num_envs, device=device)
+    return state["history"][env_ids, history_ids].reshape_as(obs)
+
+
 def quat_to_rpy(quat_xyzw: torch.Tensor) -> torch.Tensor:
     """Convert XYZW quaternions to roll-pitch-yaw Euler angles."""
 
@@ -126,10 +183,31 @@ def policy_clock(env: "ManagerBasedEnv", gait_cfg: DwlGaitCfg = DwlGaitCfg()) ->
     return clock_input(_episode_time_s(env), gait_cfg.cycle_time_s, gait_cfg.phase_offset)
 
 
+def delayed_policy_clock(
+    env: "ManagerBasedEnv", gait_cfg: DwlGaitCfg = DwlGaitCfg(), max_delay_steps: int = 4
+) -> torch.Tensor:
+    """Return delayed policy clock input."""
+
+    return delayed_policy_observation(env, "clock", policy_clock(env, gait_cfg), max_delay_steps=max_delay_steps)
+
+
 def policy_velocity_commands(env: "ManagerBasedEnv", command_name: str = "base_velocity") -> torch.Tensor:
     """Return commanded linear/yaw velocity for the policy."""
 
     return mdp.generated_commands(env, command_name)
+
+
+def delayed_policy_velocity_commands(
+    env: "ManagerBasedEnv", command_name: str = "base_velocity", max_delay_steps: int = 4
+) -> torch.Tensor:
+    """Return delayed commanded linear/yaw velocity for the policy."""
+
+    return delayed_policy_observation(
+        env,
+        "velocity_commands",
+        policy_velocity_commands(env, command_name),
+        max_delay_steps=max_delay_steps,
+    )
 
 
 def policy_joint_pos(
@@ -140,12 +218,36 @@ def policy_joint_pos(
     return mdp.joint_pos_rel(env, asset_cfg)
 
 
+def delayed_policy_joint_pos(
+    env: "ManagerBasedEnv",
+    asset_cfg: SceneEntityCfg = DEFAULT_CONTROLLED_JOINT_CFG,
+    max_delay_steps: int = 4,
+) -> torch.Tensor:
+    """Return delayed controlled joint positions relative to default pose."""
+
+    return delayed_policy_observation(
+        env, "joint_pos", policy_joint_pos(env, asset_cfg), max_delay_steps=max_delay_steps
+    )
+
+
 def policy_joint_vel(
     env: "ManagerBasedEnv", asset_cfg: SceneEntityCfg = DEFAULT_CONTROLLED_JOINT_CFG
 ) -> torch.Tensor:
     """Return controlled joint velocities relative to default velocity."""
 
     return mdp.joint_vel_rel(env, asset_cfg)
+
+
+def delayed_policy_joint_vel(
+    env: "ManagerBasedEnv",
+    asset_cfg: SceneEntityCfg = DEFAULT_CONTROLLED_JOINT_CFG,
+    max_delay_steps: int = 4,
+) -> torch.Tensor:
+    """Return delayed controlled joint velocities relative to default velocity."""
+
+    return delayed_policy_observation(
+        env, "joint_vel", policy_joint_vel(env, asset_cfg), max_delay_steps=max_delay_steps
+    )
 
 
 def policy_base_ang_vel(
@@ -156,6 +258,18 @@ def policy_base_ang_vel(
     return mdp.base_ang_vel(env, asset_cfg)
 
 
+def delayed_policy_base_ang_vel(
+    env: "ManagerBasedEnv",
+    asset_cfg: SceneEntityCfg = DEFAULT_ROBOT_CFG,
+    max_delay_steps: int = 4,
+) -> torch.Tensor:
+    """Return delayed base angular velocity from onboard IMU-like state."""
+
+    return delayed_policy_observation(
+        env, "base_ang_vel", policy_base_ang_vel(env, asset_cfg), max_delay_steps=max_delay_steps
+    )
+
+
 def policy_base_orientation(
     env: "ManagerBasedEnv", asset_cfg: SceneEntityCfg = DEFAULT_ROBOT_CFG
 ) -> torch.Tensor:
@@ -164,10 +278,35 @@ def policy_base_orientation(
     return base_orientation_rpy(env, asset_cfg)
 
 
+def delayed_policy_base_orientation(
+    env: "ManagerBasedEnv",
+    asset_cfg: SceneEntityCfg = DEFAULT_ROBOT_CFG,
+    max_delay_steps: int = 4,
+) -> torch.Tensor:
+    """Return delayed paper-aligned policy orientation as roll-pitch-yaw."""
+
+    return delayed_policy_observation(
+        env,
+        "base_orientation",
+        policy_base_orientation(env, asset_cfg),
+        max_delay_steps=max_delay_steps,
+    )
+
+
 def policy_last_action(env: "ManagerBasedEnv", action_name: str | None = None) -> torch.Tensor:
     """Return previous policy action."""
 
     return mdp.last_action(env, action_name)
+
+
+def delayed_policy_last_action(
+    env: "ManagerBasedEnv", action_name: str | None = None, max_delay_steps: int = 4
+) -> torch.Tensor:
+    """Return delayed previous policy action."""
+
+    return delayed_policy_observation(
+        env, "last_action", policy_last_action(env, action_name), max_delay_steps=max_delay_steps
+    )
 
 
 def state_base_lin_vel(
@@ -280,13 +419,13 @@ def make_policy_observation_terms(gait_cfg: DwlGaitCfg = DwlGaitCfg()) -> Mappin
     """Create the policy observation term map for `dwl_env_cfg.py`."""
 
     return {
-        "clock": ObsTerm(func=policy_clock, params={"gait_cfg": gait_cfg}),
-        "velocity_commands": ObsTerm(func=policy_velocity_commands, params={"command_name": "base_velocity"}),
-        "joint_pos": ObsTerm(func=policy_joint_pos, params={"asset_cfg": DEFAULT_CONTROLLED_JOINT_CFG}),
-        "joint_vel": ObsTerm(func=policy_joint_vel, params={"asset_cfg": DEFAULT_CONTROLLED_JOINT_CFG}),
-        "base_ang_vel": ObsTerm(func=policy_base_ang_vel, params={"asset_cfg": DEFAULT_ROBOT_CFG}),
-        "base_orientation": ObsTerm(func=policy_base_orientation, params={"asset_cfg": DEFAULT_ROBOT_CFG}),
-        "last_action": ObsTerm(func=policy_last_action),
+        "clock": ObsTerm(func=delayed_policy_clock, params={"gait_cfg": gait_cfg}),
+        "velocity_commands": ObsTerm(func=delayed_policy_velocity_commands, params={"command_name": "base_velocity"}),
+        "joint_pos": ObsTerm(func=delayed_policy_joint_pos, params={"asset_cfg": DEFAULT_CONTROLLED_JOINT_CFG}),
+        "joint_vel": ObsTerm(func=delayed_policy_joint_vel, params={"asset_cfg": DEFAULT_CONTROLLED_JOINT_CFG}),
+        "base_ang_vel": ObsTerm(func=delayed_policy_base_ang_vel, params={"asset_cfg": DEFAULT_ROBOT_CFG}),
+        "base_orientation": ObsTerm(func=delayed_policy_base_orientation, params={"asset_cfg": DEFAULT_ROBOT_CFG}),
+        "last_action": ObsTerm(func=delayed_policy_last_action),
     }
 
 
