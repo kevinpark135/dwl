@@ -8,6 +8,8 @@ DWL task and environment configuration built for Isaac Lab. Copy this repository
 
 - Isaac-Velocity-DWL-G1-v0
 - Isaac-Velocity-DWL-G1-Play-v0
+- Isaac-Velocity-ProprioBaseline-G1-v0
+- Isaac-Velocity-ProprioBaseline-G1-Play-v0
 
 ## Local Train/Play CLI
 
@@ -16,55 +18,67 @@ All commands below are one-line commands for this machine's Isaac Lab checkout a
 Smoke-test training, small env count and tiny iteration count:
 
 ```bash
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 64 --max_iterations 5 --headless
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-v0 --num_envs 64 --max_iterations 5 --headless
 ```
 
 Short debug training:
 
 ```bash
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 128 --max_iterations 50 --headless
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-v0 --num_envs 128 --max_iterations 50 --headless
 ```
 
 Medium training run:
 
 ```bash
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 1024 --max_iterations 500 --headless
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-v0 --num_envs 1024 --max_iterations 500 --headless
 ```
 
-Baseline training run:
+DWL full training run:
 
 ```bash
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
+```
+
+Proprioception-only stock G1 PPO baseline without DWL-specific model, rewards, observations, domain randomization, or external height-scan policy input:
+
+```bash
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-ProprioBaseline-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
+```
+
+Equivalent baseline wrapper script from the Isaac Lab checkout:
+
+```bash
+source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion/velocity/config/dwl/scripts/train_proprio_baseline.sh
 ```
 
 Full PhysX-style training:
 
 ```bash
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 1000 --headless
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 1000 --headless
 ```
 
 Long Newton-style training budget:
 
 ```bash
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 5000 --headless
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 5000 --headless
 ```
 
 Play latest checkpoint from `logs/rsl_rl/g1_dwl`:
 
 ```bash
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 32
+./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 32
 ```
 
 Play latest checkpoint with fewer envs:
 
 ```bash
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 8
+./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 8
 ```
 
 Play a specific checkpoint:
 
 ```bash
-./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 50 --checkpoint /home/kevinpark135/IsaacLab/logs/rsl_rl/g1_dwl/<RUN_DIR>/model_<ITER>.pt
+./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 50 --checkpoint /home/kevinpark135/IsaacLab/logs/rsl_rl/g1_dwl/<RUN_DIR>/model_<ITER>.pt
 ```
 
 ## File Layout
@@ -73,6 +87,7 @@ Play a specific checkpoint:
 dwl/
 ├── __init__.py
 ├── dwl_env_cfg.py
+├── baseline_env_cfg.py
 ├── actions.py
 ├── observations.py
 ├── rewards.py
@@ -86,6 +101,8 @@ dwl/
 │   ├── dwl_model.py
 │   ├── dwl_ppo.py
 │   └── dwl_runner.py
+├── scripts/
+│   └── train_proprio_baseline.sh
 ├── tests/
 │   ├── test_gait.py
 │   ├── test_events.py

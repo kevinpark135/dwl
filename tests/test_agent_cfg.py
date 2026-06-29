@@ -7,7 +7,7 @@ import torch
 from isaaclab.utils.dict import class_to_dict
 from tensordict import TensorDict
 
-from agents.rsl_rl_ppo_cfg import G1DwlPPORunnerCfg
+from agents.rsl_rl_ppo_cfg import G1DwlPPORunnerCfg, G1ProprioceptiveBaselinePPORunnerCfg
 from rsl_rl.dwl_model import DwlActorModel, DwlCriticModel
 from rsl_rl.dwl_ppo import DwlPPO
 
@@ -47,3 +47,13 @@ def test_dwl_agent_cfg_constructs_dwl_algorithm_from_serialized_config():
     assert isinstance(alg.critic, DwlCriticModel)
     assert alg.actor.history_length == 5
     assert alg.actor.reconstruction_target(obs).shape == (4, 64)
+
+
+def test_proprioceptive_baseline_agent_cfg_uses_stock_ppo_components():
+    cfg = G1ProprioceptiveBaselinePPORunnerCfg()
+
+    assert cfg.class_name == "OnPolicyRunner"
+    assert cfg.experiment_name == "g1_proprio_baseline"
+    assert cfg.actor.class_name == "MLPModel"
+    assert cfg.critic.class_name == "MLPModel"
+    assert cfg.algorithm.class_name == "PPO"

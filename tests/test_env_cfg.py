@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from actions import DwlJointPositionActionCfg
+from baseline_env_cfg import G1ProprioceptiveBaselineEnvCfg, G1ProprioceptiveBaselineEnvCfg_PLAY
 from dwl_env_cfg import G1DwlEnvCfg, G1DwlEnvCfg_PLAY
 from observations import CONTROLLED_LEG_JOINT_NAMES
 
@@ -58,3 +59,19 @@ def test_play_cfg_disables_policy_noise_and_push_wrenches():
     assert cfg.events.add_base_mass is None
     assert cfg.events.base_external_force_torque is None
     assert cfg.events.push_force_torques is None
+
+
+def test_proprioceptive_baseline_removes_external_height_scan_sensor():
+    cfg = G1ProprioceptiveBaselineEnvCfg()
+
+    assert cfg.observations.policy.height_scan is None
+    assert cfg.scene.height_scanner is None
+    assert cfg.rewards.track_lin_vel_xy_exp is not None
+
+
+def test_proprioceptive_baseline_play_removes_external_height_scan_sensor():
+    cfg = G1ProprioceptiveBaselineEnvCfg_PLAY()
+
+    assert cfg.observations.policy.height_scan is None
+    assert cfg.scene.height_scanner is None
+    assert not cfg.observations.policy.enable_corruption
