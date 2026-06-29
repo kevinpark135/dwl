@@ -356,6 +356,22 @@ Matched the paper's Table I/VI/VIII settings for the DWL model path: encoder
 input remains `47`, privileged decoder/critic state is now `184`, height scan is
 `96`, network widths follow Table VI, and PPO coefficients follow Table VIII.
 
+### Locomotion Reward Rebalance
+
+The standing local optimum was too strong: the robot learned to remain upright
+without translating, which kept terrain curriculum stuck. Horizontal base
+velocity was removed from `base_motion_penalty` so commanded forward motion is
+not punished by a stability term. Standing-style rewards were reduced
+(`alive`, `orientation_tracking`, `base_height_tracking`, `default_joint_tracking`)
+and `double_support` was disabled as a positive reward.
+
+Velocity tracking is now the dominant objective: `lin_velocity_tracking` was
+raised to `4.0`, yaw tracking was raised to `1.5`, and swing-foot motion was
+made more important while foot/default/smoothness regularizers were weakened.
+Initial terrain difficulty was also lowered to `max_init_terrain_level = 1` so
+distance-based curriculum can promote the policy after it actually learns to
+move instead of starting on rough level 5 while stationary.
+
 Next check: run a short 1024-env training job and confirm `base_contact` drops,
 episode length increases, and the robot can survive the initial contact while
 tracking low-speed commands.

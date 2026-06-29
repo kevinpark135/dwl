@@ -38,18 +38,18 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
     assert cfg.scene.robot.soft_joint_pos_limit_factor == 1.0
     assert cfg.scene.robot.actuators["legs"].damping[".*_knee_joint"] == 12.0
     assert cfg.scene.robot.actuators["feet"].damping == 8.0
-    assert cfg.rewards.alive.weight == 0.5
-    assert cfg.rewards.double_support.weight == 0.05
+    assert cfg.rewards.alive.weight == 0.05
+    assert cfg.rewards.double_support.weight == 0.0
     assert cfg.rewards.base_motion_penalty.weight == -0.01
-    assert cfg.rewards.lin_velocity_tracking.weight == 1.0
+    assert cfg.rewards.lin_velocity_tracking.weight == 4.0
     assert cfg.rewards.periodic_force.weight == 0.6
-    assert cfg.rewards.periodic_velocity.weight == 0.5
-    assert cfg.rewards.foot_height_tracking.weight == 0.6
-    assert cfg.rewards.foot_velocity_tracking.weight == 0.4
-    assert cfg.rewards.default_joint_tracking.weight == 0.1
-    assert cfg.rewards.action_smoothness.weight == -0.001
+    assert cfg.rewards.periodic_velocity.weight == 1.0
+    assert cfg.rewards.foot_height_tracking.weight == 0.3
+    assert cfg.rewards.foot_velocity_tracking.weight == 0.2
+    assert cfg.rewards.default_joint_tracking.weight == 0.02
+    assert cfg.rewards.action_smoothness.weight == -0.0002
     assert cfg.rewards.energy_cost.weight == -0.00003
-    assert cfg.rewards.feet_movement.weight == -0.002
+    assert cfg.rewards.feet_movement.weight == -0.0005
     assert cfg.rewards.track_lin_vel_xy_exp is None
     assert cfg.rewards.dof_torques_l2 is None
 
@@ -62,11 +62,11 @@ def test_dwl_env_cfg_wires_dwl_events():
     assert cfg.events.physics_material.params["static_friction_range"] == (0.2, 2.0)
     assert cfg.events.reset_robot_joints.params["position_range"] == (-0.05, 0.05)
     assert cfg.events.reset_robot_joints.params["velocity_range"] == (-0.1, 0.1)
-    assert cfg.commands.base_velocity.ranges.lin_vel_x == (0.2, 0.8)
-    assert cfg.commands.base_velocity.ranges.ang_vel_z == (-0.8, 0.8)
+    assert cfg.commands.base_velocity.ranges.lin_vel_x == (0.4, 1.0)
+    assert cfg.commands.base_velocity.ranges.ang_vel_z == (-0.4, 0.4)
     assert cfg.events.reset_base.params["pose_range"]["yaw"] == (-0.1, 0.1)
     assert cfg.events.reset_base.params["velocity_range"]["roll"] == (-0.05, 0.05)
-    assert cfg.scene.terrain.max_init_terrain_level == 5
+    assert cfg.scene.terrain.max_init_terrain_level == 1
     assert cfg.scene.height_scanner.pattern_cfg.resolution == 0.1
     assert cfg.scene.height_scanner.pattern_cfg.size == [1.1, 0.7]
     assert cfg.rewards.feet_movement.params["acceleration_scale"] == 10.0

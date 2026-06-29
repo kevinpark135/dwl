@@ -92,7 +92,7 @@ def test_velocity_and_height_tracking_are_one_when_at_target():
     assert torch.allclose(base_height_tracking(env), torch.ones(1))
 
 
-def test_stand_first_rewards_encourage_survival_stillness_and_double_support():
+def test_stability_rewards_ignore_commanded_horizontal_motion():
     env = _mock_env()
     sensor_cfg = SceneEntityCfg("contact_forces", body_ids=[0, 1])
 
@@ -102,7 +102,7 @@ def test_stand_first_rewards_encourage_survival_stillness_and_double_support():
 
     env.scene["robot"].data.root_lin_vel_b.torch[:] = torch.tensor([[1.0, 2.0, 3.0]])
     env.scene["robot"].data.root_ang_vel_b.torch[:] = torch.tensor([[4.0, 5.0, 6.0]])
-    assert torch.allclose(base_motion_penalty(env), torch.tensor([55.0]))
+    assert torch.allclose(base_motion_penalty(env), torch.tensor([50.0]))
 
 
 def test_periodic_force_rewards_stance_foot_contact():

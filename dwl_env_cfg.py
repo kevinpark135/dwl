@@ -132,7 +132,7 @@ class G1Observations:
 class G1Rewards(RewardsCfg):
     """Reward terms for the MDP."""
 
-    alive = RewTerm(func=dwl_rewards.alive, weight=0.5)
+    alive = RewTerm(func=dwl_rewards.alive, weight=0.05)
     termination_penalty = RewTerm(func=mdp.is_terminated, weight=-100.0)
     base_motion_penalty = RewTerm(
         func=dwl_rewards.base_motion_penalty,
@@ -141,23 +141,23 @@ class G1Rewards(RewardsCfg):
     )
     double_support = RewTerm(
         func=dwl_rewards.double_support,
-        weight=0.05,
+        weight=0.0,
         params={"sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG},
     )
     lin_velocity_tracking = RewTerm(
         func=dwl_rewards.lin_velocity_tracking,
-        weight=1.0,
-        params={"command_name": "base_velocity", "tolerance": 5.0},
+        weight=4.0,
+        params={"command_name": "base_velocity", "tolerance": 3.0},
     )
     ang_velocity_tracking = RewTerm(
         func=dwl_rewards.ang_velocity_tracking,
-        weight=1.0,
-        params={"command_name": "base_velocity", "tolerance": 7.0},
+        weight=1.5,
+        params={"command_name": "base_velocity", "tolerance": 5.0},
     )
-    orientation_tracking = RewTerm(func=dwl_rewards.orientation_tracking, weight=3.0, params={"tolerance": 5.0})
+    orientation_tracking = RewTerm(func=dwl_rewards.orientation_tracking, weight=1.0, params={"tolerance": 5.0})
     base_height_tracking = RewTerm(
         func=dwl_rewards.base_height_tracking,
-        weight=3.0,
+        weight=1.0,
         params={"target_height": 0.7, "tolerance": 10.0},
     )
     periodic_force = RewTerm(
@@ -167,22 +167,22 @@ class G1Rewards(RewardsCfg):
     )
     periodic_velocity = RewTerm(
         func=dwl_rewards.periodic_velocity,
-        weight=0.5,
+        weight=1.0,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG},
     )
     foot_height_tracking = RewTerm(
         func=dwl_rewards.foot_height_tracking,
-        weight=0.6,
+        weight=0.3,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "tolerance": 5.0},
     )
     foot_velocity_tracking = RewTerm(
         func=dwl_rewards.foot_velocity_tracking,
-        weight=0.4,
+        weight=0.2,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "tolerance": 3.0},
     )
     default_joint_tracking = RewTerm(
         func=dwl_rewards.default_joint_tracking,
-        weight=0.1,
+        weight=0.02,
         params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG, "tolerance": 2.0},
     )
     energy_cost = RewTerm(
@@ -190,10 +190,10 @@ class G1Rewards(RewardsCfg):
         weight=-0.00003,
         params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG},
     )
-    action_smoothness = RewTerm(func=dwl_rewards.action_smoothness, weight=-0.001)
+    action_smoothness = RewTerm(func=dwl_rewards.action_smoothness, weight=-0.0002)
     feet_movement = RewTerm(
         func=dwl_rewards.feet_movement,
-        weight=-0.002,
+        weight=-0.0005,
         params={"asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "acceleration_scale": 10.0},
     )
     large_contact = RewTerm(
@@ -241,9 +241,9 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.scene.robot.actuators["feet"].damping = 8.0
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/torso_link"
         self.scene.height_scanner.pattern_cfg = patterns.GridPatternCfg(resolution=0.1, size=[1.1, 0.7])
-        # Keep terrain initialization at level 5; do not lower this for future
-        # stand-up debugging unless the experiment explicitly changes terrain.
-        self.scene.terrain.max_init_terrain_level = 5
+        # Start on easier terrain and let distance-based curriculum promote the
+        # policy after it actually learns to translate.
+        self.scene.terrain.max_init_terrain_level = 1
         self.actions.joint_pos = dwl_actions.DwlJointPositionActionCfg(
             asset_name="robot",
             joint_names=dwl_obs.CONTROLLED_LEG_JOINT_NAMES,
@@ -355,9 +355,9 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         # Commands: avoid the zero-command corner so early rollouts have a reason
         # to move their legs instead of discovering a passive crouch.
-        self.commands.base_velocity.ranges.lin_vel_x = (0.2, 0.8)
+        self.commands.base_velocity.ranges.lin_vel_x = (0.4, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
-        self.commands.base_velocity.ranges.ang_vel_z = (-0.8, 0.8)
+        self.commands.base_velocity.ranges.ang_vel_z = (-0.4, 0.4)
 
         # Start close to the precise G1 default pose. The stock rough task uses a
         # wide reset distribution, but large initial joint/base perturbations make

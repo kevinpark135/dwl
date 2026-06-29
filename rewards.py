@@ -100,12 +100,16 @@ def alive(env: "ManagerBasedRLEnv") -> torch.Tensor:
 
 
 def base_motion_penalty(env: "ManagerBasedRLEnv", asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
-    """Penalize root linear and angular motion for stand-first training."""
+    """Penalize uncommanded vertical/roll/pitch base motion.
+
+    Horizontal base velocity is handled by the command tracking rewards. Penalizing
+    it here creates a standing local optimum that directly fights locomotion.
+    """
 
     asset = env.scene[asset_cfg.name]
     lin_vel = asset.data.root_lin_vel_b.torch
     ang_vel = asset.data.root_ang_vel_b.torch
-    return torch.sum(torch.square(lin_vel), dim=-1) + torch.sum(torch.square(ang_vel[:, :2]), dim=-1)
+    return torch.square(lin_vel[:, 2]) + torch.sum(torch.square(ang_vel[:, :2]), dim=-1)
 
 
 def double_support(
