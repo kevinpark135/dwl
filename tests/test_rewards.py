@@ -134,7 +134,7 @@ def test_feet_movement_penalizes_only_vertical_foot_motion():
     env.scene["robot"].data.body_lin_acc_w.torch[:, :, 2] = torch.tensor([[3.0, 4.0]])
     asset_cfg = SceneEntityCfg("robot", body_ids=[0, 1])
 
-    assert torch.allclose(feet_movement(env, asset_cfg=asset_cfg), torch.tensor([30.0]))
+    assert torch.allclose(feet_movement(env, asset_cfg=asset_cfg), torch.tensor([5.25]))
 
 
 def test_large_contact_penalizes_force_above_threshold():

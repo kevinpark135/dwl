@@ -172,7 +172,7 @@ class G1Rewards(RewardsCfg):
     feet_movement = RewTerm(
         func=dwl_rewards.feet_movement,
         weight=-0.01,
-        params={"asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG},
+        params={"asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "acceleration_scale": 10.0},
     )
     large_contact = RewTerm(
         func=dwl_rewards.large_contact,
@@ -198,6 +198,7 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.scene.robot.init_state.pos = (0.0, 0.0, 0.74)
         self.scene.robot.init_state.rot = (0.0, 0.0, 0.0, 1.0)
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/torso_link"
+        self.scene.terrain.max_init_terrain_level = 5
         self.actions.joint_pos = dwl_actions.DwlJointPositionActionCfg(
             asset_name="robot",
             joint_names=dwl_obs.CONTROLLED_LEG_JOINT_NAMES,

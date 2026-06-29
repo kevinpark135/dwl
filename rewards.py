@@ -245,13 +245,16 @@ def action_smoothness(env: "ManagerBasedRLEnv") -> torch.Tensor:
 
 
 def feet_movement(
-    env: "ManagerBasedRLEnv", asset_cfg: SceneEntityCfg = DEFAULT_FOOT_BODY_CFG
+    env: "ManagerBasedRLEnv",
+    asset_cfg: SceneEntityCfg = DEFAULT_FOOT_BODY_CFG,
+    velocity_scale: float = 1.0,
+    acceleration_scale: float = 10.0,
 ) -> torch.Tensor:
-    """Return vertical foot velocity/acceleration regularization term."""
+    """Return scaled vertical foot velocity/acceleration regularization term."""
 
     asset = env.scene[asset_cfg.name]
-    foot_vel_z = asset.data.body_link_vel_w.torch[:, asset_cfg.body_ids, 2]
-    foot_acc_z = asset.data.body_lin_acc_w.torch[:, asset_cfg.body_ids, 2]
+    foot_vel_z = asset.data.body_link_vel_w.torch[:, asset_cfg.body_ids, 2] / velocity_scale
+    foot_acc_z = asset.data.body_lin_acc_w.torch[:, asset_cfg.body_ids, 2] / acceleration_scale
     return torch.sum(torch.square(foot_vel_z) + torch.square(foot_acc_z), dim=-1)
 
 

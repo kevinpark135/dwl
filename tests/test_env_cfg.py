@@ -42,6 +42,8 @@ def test_dwl_env_cfg_wires_dwl_events():
     assert cfg.events.reset_robot_joints.params["velocity_range"] == (-0.1, 0.1)
     assert cfg.events.reset_base.params["pose_range"]["yaw"] == (-0.1, 0.1)
     assert cfg.events.reset_base.params["velocity_range"]["roll"] == (-0.05, 0.05)
+    assert cfg.scene.terrain.max_init_terrain_level == 0
+    assert cfg.rewards.feet_movement.params["acceleration_scale"] == 10.0
     assert cfg.events.system_delay.params["delay_range_s"] == (0.0, 0.01)
     assert cfg.events.motor_offset.params["offset_range"] == (-0.05, 0.05)
     assert cfg.events.motor_strength.params["strength_distribution_params"] == (0.9, 1.1)

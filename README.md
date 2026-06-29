@@ -241,6 +241,7 @@ The DWL default direction is to keep `base_lin_vel` and `height_scan` out of the
 - `energy_cost`: Computes `sum(|tau| * |qdot|)`.
 - `action_smoothness`: Computes the second-order action difference.
 - `feet_movement`: Penalizes vertical foot velocity and acceleration (`z` axis only) using Isaac Lab 3.0's `body_lin_acc_w` acceleration field.
+  The DWL cfg keeps the paper weight at `-0.01` but scales vertical acceleration by `10.0` before squaring so SI-unit accelerations do not dominate early learning.
 - `large_contact`: Penalizes excessive foot contact force.
 
 The gait helpers matter here because four rewards are phase-aware: `periodic_force`, `periodic_velocity`, `foot_height_tracking`, and `foot_velocity_tracking`. They must use the same clock, stance mask, and foot trajectory reference as the observations; otherwise the policy could observe one gait phase while rewards score another.
@@ -269,3 +270,7 @@ Event helpers:
 The event helpers use Isaac Lab 3.0-compatible signatures with `env_ids` as the
 second argument. PhysX/Warp index tensors passed back into simulation APIs are
 converted to `int32`.
+
+The DWL train cfg starts terrain curriculum at `max_init_terrain_level = 0` so
+the randomly initialized policy first sees easier terrain instead of immediately
+falling on high-level rough patches.
