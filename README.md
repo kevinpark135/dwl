@@ -9,6 +9,70 @@ DWL task and environment configuration built for Isaac Lab. Copy this repository
 - Isaac-Velocity-DWL-G1-v0
 - Isaac-Velocity-DWL-G1-Play-v0
 
+## Local Train/Play CLI
+
+All commands below are one-line commands for this machine's Isaac Lab checkout at `/home/kevinpark135/IsaacLab`.
+
+Smoke-test training, small env count and tiny iteration count:
+
+```bash
+cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 64 --max_iterations 5 --headless --run_name smoke_64env_5it
+```
+
+Short debug training:
+
+```bash
+cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 128 --max_iterations 50 --headless --run_name debug_128env_50it
+```
+
+Medium training run:
+
+```bash
+cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 1024 --max_iterations 500 --headless --run_name mid_1024env_500it
+```
+
+Default-scale PhysX training:
+
+```bash
+cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 3000 --headless --run_name physx_4096env_3000it
+```
+
+Long Newton-style training budget:
+
+```bash
+cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 5000 --headless --run_name long_4096env_5000it
+```
+
+Resume a run by run folder name and checkpoint pattern:
+
+```bash
+cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train_rsl_rl.py --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 3000 --headless --resume --load_run ".*physx_4096env_3000it" --checkpoint "model_.*.pt"
+```
+
+Play latest checkpoint from `logs/rsl_rl/g1_dwl`:
+
+```bash
+cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 50
+```
+
+Play latest checkpoint with fewer envs:
+
+```bash
+cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 8
+```
+
+Play a specific checkpoint:
+
+```bash
+cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 50 --checkpoint /home/kevinpark135/IsaacLab/logs/rsl_rl/g1_dwl/<RUN_DIR>/model_<ITER>.pt
+```
+
+Play and record video:
+
+```bash
+cd /home/kevinpark135/IsaacLab && ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play_rsl_rl.py --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 16 --video --video_length 400
+```
+
 ## File Layout
 
 ```text
