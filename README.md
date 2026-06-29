@@ -350,6 +350,12 @@ restores default joint targets instead of zero targets, startup action delay is
 disabled for this phase, and gait/action exploration was raised again so the
 first sampled actions can reach the legs immediately.
 
+### Paper Dimension Alignment
+
+Matched the paper's Table I/VI/VIII settings for the DWL model path: encoder
+input remains `47`, privileged decoder/critic state is now `184`, height scan is
+`96`, network widths follow Table VI, and PPO coefficients follow Table VIII.
+
 Next check: run a short 1024-env training job and confirm `base_contact` drops,
 episode length increases, and the robot can survive the initial contact while
 tracking low-speed commands.

@@ -15,6 +15,13 @@ def test_dwl_env_cfg_wires_policy_and_privileged_observations():
     assert cfg.observations.policy.history_length == 5
     assert cfg.observations.policy.flatten_history_dim
     assert cfg.observations.privileged.concatenate_terms
+    assert cfg.observations.privileged.clock is not None
+    assert cfg.observations.privileged.velocity_commands is not None
+    assert cfg.observations.privileged.joint_pos is not None
+    assert cfg.observations.privileged.joint_vel is not None
+    assert cfg.observations.privileged.base_ang_vel is not None
+    assert cfg.observations.privileged.base_orientation is not None
+    assert cfg.observations.privileged.last_action is not None
     assert cfg.observations.policy.joint_pos.noise.n_min == -0.3
     assert cfg.observations.policy.joint_vel.noise.n_max == 1.0
     assert cfg.observations.policy.base_ang_vel.noise.n_min == -0.1
@@ -60,6 +67,8 @@ def test_dwl_env_cfg_wires_dwl_events():
     assert cfg.events.reset_base.params["pose_range"]["yaw"] == (-0.1, 0.1)
     assert cfg.events.reset_base.params["velocity_range"]["roll"] == (-0.05, 0.05)
     assert cfg.scene.terrain.max_init_terrain_level == 5
+    assert cfg.scene.height_scanner.pattern_cfg.resolution == 0.1
+    assert cfg.scene.height_scanner.pattern_cfg.size == [1.1, 0.7]
     assert cfg.rewards.feet_movement.params["acceleration_scale"] == 10.0
     assert cfg.events.system_delay.params["delay_range_s"] == (0.0, 0.0)
     assert cfg.events.motor_offset.params["offset_range"] == (-0.05, 0.05)

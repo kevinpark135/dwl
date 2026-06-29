@@ -19,24 +19,32 @@ def test_dwl_agent_cfg_points_to_dwl_runner_model_and_algorithm():
     assert cfg.obs_groups == {"actor": ["policy"], "critic": ["privileged"]}
     assert cfg.actor.class_name.endswith(":DwlActorModel")
     assert cfg.actor.history_length == 5
-    assert cfg.actor.encoder_hidden_dim == 128
-    assert cfg.actor.latent_dim == 64
+    assert cfg.actor.encoder_hidden_dim == 256
+    assert cfg.actor.latent_dim == 24
     assert cfg.actor.decoder_obs_set == "critic"
+    assert cfg.actor.hidden_dims == [48]
+    assert cfg.actor.decoder_hidden_dims == [64]
     assert cfg.actor.obs_normalization
-    assert cfg.actor.distribution_cfg.init_std == 1.5
+    assert cfg.actor.distribution_cfg.init_std == 1.0
     assert cfg.critic.class_name.endswith(":DwlCriticModel")
+    assert cfg.critic.hidden_dims == [512, 512, 256]
     assert cfg.critic.obs_normalization
     assert cfg.algorithm.class_name.endswith(":DwlPPO")
     assert cfg.algorithm.reconstruction_loss_coef == 1.0
-    assert cfg.algorithm.latent_l1_loss_coef == 1.0e-3
-    assert cfg.algorithm.entropy_coef == 0.02
+    assert cfg.algorithm.latent_l1_loss_coef == 0.002
+    assert cfg.algorithm.policy_loss_coef == 5.0
+    assert cfg.algorithm.value_loss_coef == 5.0
+    assert cfg.algorithm.entropy_coef == 0.005
+    assert cfg.algorithm.num_learning_epochs == 2
+    assert cfg.algorithm.learning_rate == 1.0e-5
+    assert cfg.algorithm.gamma == 0.995
 
 
 def test_dwl_agent_cfg_constructs_dwl_algorithm_from_serialized_config():
     obs = TensorDict(
         {
             "policy": torch.randn(4, 47 * 5),
-            "privileged": torch.randn(4, 64),
+            "privileged": torch.randn(4, 184),
         },
         batch_size=[4],
     )
@@ -50,7 +58,7 @@ def test_dwl_agent_cfg_constructs_dwl_algorithm_from_serialized_config():
     assert alg.actor.__class__.__name__ == "DwlActorModel"
     assert alg.critic.__class__.__name__ == "DwlCriticModel"
     assert alg.actor.history_length == 5
-    assert alg.actor.reconstruction_target(obs).shape == (4, 64)
+    assert alg.actor.reconstruction_target(obs).shape == (4, 184)
 
 
 def test_proprioceptive_baseline_agent_cfg_uses_stock_ppo_components():

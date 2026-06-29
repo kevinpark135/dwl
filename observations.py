@@ -433,6 +433,13 @@ def make_privileged_observation_terms(gait_cfg: DwlGaitCfg = DwlGaitCfg()) -> Ma
     """Create the privileged/state observation term map for `dwl_env_cfg.py`."""
 
     return {
+        "clock": ObsTerm(func=policy_clock, params={"gait_cfg": gait_cfg}),
+        "velocity_commands": ObsTerm(func=policy_velocity_commands, params={"command_name": "base_velocity"}),
+        "joint_pos": ObsTerm(func=policy_joint_pos, params={"asset_cfg": DEFAULT_CONTROLLED_JOINT_CFG}),
+        "joint_vel": ObsTerm(func=policy_joint_vel, params={"asset_cfg": DEFAULT_CONTROLLED_JOINT_CFG}),
+        "base_ang_vel": ObsTerm(func=policy_base_ang_vel, params={"asset_cfg": DEFAULT_ROBOT_CFG}),
+        "base_orientation": ObsTerm(func=policy_base_orientation, params={"asset_cfg": DEFAULT_ROBOT_CFG}),
+        "last_action": ObsTerm(func=policy_last_action),
         "base_lin_vel": ObsTerm(func=state_base_lin_vel, params={"asset_cfg": DEFAULT_ROBOT_CFG}),
         "friction": ObsTerm(func=state_friction),
         "push_force_torques": ObsTerm(func=state_push_force_torques),

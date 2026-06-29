@@ -47,6 +47,7 @@ def _make_algorithm(num_envs=4, num_steps=2):
         desired_kl=None,
         reconstruction_loss_coef=0.25,
         latent_l1_loss_coef=0.05,
+        policy_loss_coef=2.0,
         device="cpu",
     )
 
@@ -122,6 +123,7 @@ def test_dwl_ppo_construct_algorithm_resolves_dwl_models_from_config():
             "symmetry_cfg": None,
             "reconstruction_loss_coef": 0.25,
             "latent_l1_loss_coef": 0.05,
+            "policy_loss_coef": 2.0,
         },
     }
 
@@ -130,3 +132,4 @@ def test_dwl_ppo_construct_algorithm_resolves_dwl_models_from_config():
     assert isinstance(alg, DwlPPO)
     assert alg.reconstruction_loss_coef == 0.25
     assert alg.latent_l1_loss_coef == 0.05
+    assert alg.policy_loss_coef == 2.0

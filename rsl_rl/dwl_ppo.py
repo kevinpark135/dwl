@@ -7,7 +7,9 @@ This module keeps the stock RSL-RL PPO rollout, return, save/load, and
 construction behavior, while adding the two DWL auxiliary losses during policy
 updates:
 
-    PPO loss + reconstruction_loss_coef * decoder MSE
+    policy_loss_coef * PPO surrogate
+             + value_loss_coef * value loss
+             + reconstruction_loss_coef * decoder MSE
              + latent_l1_loss_coef * latent L1
 """
 
@@ -27,11 +29,13 @@ class DwlPPO(PPO):
         *args,
         reconstruction_loss_coef: float = 1.0,
         latent_l1_loss_coef: float = 0.0,
+        policy_loss_coef: float = 1.0,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.reconstruction_loss_coef = float(reconstruction_loss_coef)
         self.latent_l1_loss_coef = float(latent_l1_loss_coef)
+        self.policy_loss_coef = float(policy_loss_coef)
 
     def update(self) -> dict[str, float]:
         """Run PPO update epochs and add DWL auxiliary model losses."""
@@ -121,7 +125,7 @@ class DwlPPO(PPO):
 
             reconstruction_loss, latent_l1_loss = self._dwl_losses(auxiliary_obs)
             loss = (
-                surrogate_loss
+                self.policy_loss_coef * surrogate_loss
                 + self.value_loss_coef * value_loss
                 - self.entropy_coef * entropy.mean()
                 + self.reconstruction_loss_coef * reconstruction_loss

@@ -15,6 +15,7 @@ from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
+from isaaclab.sensors import patterns
 from isaaclab.utils.configclass import configclass
 from isaaclab.utils.noise import UniformNoiseCfg as Unoise
 
@@ -87,6 +88,16 @@ class G1Observations:
     class PrivilegedCfg(ObsGroup):
         """Simulation-only state used by critic and decoder targets."""
 
+        clock = ObsTerm(func=dwl_obs.policy_clock, params={"gait_cfg": DwlGaitCfg()})
+        velocity_commands = ObsTerm(func=dwl_obs.policy_velocity_commands, params={"command_name": "base_velocity"})
+        joint_pos = ObsTerm(func=dwl_obs.policy_joint_pos, params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG})
+        joint_vel = ObsTerm(func=dwl_obs.policy_joint_vel, params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG})
+        base_ang_vel = ObsTerm(func=dwl_obs.policy_base_ang_vel, params={"asset_cfg": dwl_obs.DEFAULT_ROBOT_CFG})
+        base_orientation = ObsTerm(
+            func=dwl_obs.policy_base_orientation,
+            params={"asset_cfg": dwl_obs.DEFAULT_ROBOT_CFG},
+        )
+        last_action = ObsTerm(func=dwl_obs.policy_last_action)
         base_lin_vel = ObsTerm(func=dwl_obs.state_base_lin_vel, params={"asset_cfg": dwl_obs.DEFAULT_ROBOT_CFG})
         friction = ObsTerm(func=dwl_obs.state_friction)
         push_force_torques = ObsTerm(func=dwl_obs.state_push_force_torques)
@@ -229,6 +240,7 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.scene.robot.actuators["feet"].stiffness = 30.0
         self.scene.robot.actuators["feet"].damping = 8.0
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/torso_link"
+        self.scene.height_scanner.pattern_cfg = patterns.GridPatternCfg(resolution=0.1, size=[1.1, 0.7])
         # Keep terrain initialization at level 5; do not lower this for future
         # stand-up debugging unless the experiment explicitly changes terrain.
         self.scene.terrain.max_init_terrain_level = 5

@@ -140,6 +140,13 @@ def test_observation_term_factories_include_expected_terms():
         "last_action",
     }
     assert set(make_privileged_observation_terms()) == {
+        "clock",
+        "velocity_commands",
+        "joint_pos",
+        "joint_vel",
+        "base_ang_vel",
+        "base_orientation",
+        "last_action",
         "base_lin_vel",
         "friction",
         "push_force_torques",
