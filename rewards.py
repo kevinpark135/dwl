@@ -99,6 +99,25 @@ def _foot_pos_vel(env: "ManagerBasedRLEnv", asset_cfg: SceneEntityCfg) -> tuple[
     return foot_pos_w, foot_vel_w
 
 
+def _yaw_rotate_inverse(asset, vector_w: torch.Tensor) -> torch.Tensor:
+    """Rotate world-frame vectors into the base yaw frame when root orientation is available."""
+
+    root_quat = getattr(asset.data, "root_quat_w", None)
+    if root_quat is None:
+        return vector_w
+
+    quat = root_quat.torch
+    x, y, z, w = quat[:, 0], quat[:, 1], quat[:, 2], quat[:, 3]
+    yaw = torch.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+    cos_yaw = torch.cos(yaw).unsqueeze(-1)
+    sin_yaw = torch.sin(yaw).unsqueeze(-1)
+
+    vector_b = vector_w.clone()
+    vector_b[..., 0] = cos_yaw * vector_w[..., 0] + sin_yaw * vector_w[..., 1]
+    vector_b[..., 1] = -sin_yaw * vector_w[..., 0] + cos_yaw * vector_w[..., 1]
+    return vector_b
+
+
 def _action_history(env: "ManagerBasedRLEnv") -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     action = env.action_manager.action
     prev_action = env.action_manager.prev_action
@@ -339,6 +358,61 @@ def foot_velocity_tracking(
     mask = 1.0 - stance_mask(_episode_time_s(env), gait_cfg.cycle_time_s, gait_cfg.phase_offset)
     error = (actual_velocity - target_velocity) * mask
     return tracking_exp(error, tolerance)
+
+
+def foot_lateral_tracking(
+    env: "ManagerBasedRLEnv",
+    target_width: float = 0.22,
+    tolerance: float = 40.0,
+    asset_cfg: SceneEntityCfg = DEFAULT_FOOT_BODY_CFG,
+) -> torch.Tensor:
+    """Reward a natural left/right foot corridor instead of a wide A-frame stance."""
+
+    asset = env.scene[asset_cfg.name]
+    foot_pos_w, _ = _foot_pos_vel(env, asset_cfg)
+    rel_foot_pos_w = foot_pos_w - asset.data.root_pos_w.torch[:, None, :3]
+    foot_pos_b = _yaw_rotate_inverse(asset, rel_foot_pos_w)
+
+    half_width = 0.5 * target_width
+    target_y = torch.tensor([half_width, -half_width], device=foot_pos_b.device, dtype=foot_pos_b.dtype)
+    target_y = target_y[: foot_pos_b.shape[1]].unsqueeze(0)
+    lateral_error = foot_pos_b[..., 1] - target_y
+
+    crossing_error = torch.zeros(_num_envs(env), device=foot_pos_b.device, dtype=foot_pos_b.dtype)
+    if foot_pos_b.shape[1] >= 2:
+        crossing_error = torch.clamp(foot_pos_b[:, 1, 1] - foot_pos_b[:, 0, 1], min=0.0).unsqueeze(-1)
+        lateral_error = torch.cat((lateral_error, crossing_error), dim=-1)
+
+    return tracking_exp(lateral_error, tolerance)
+
+
+def foot_lateral_velocity(
+    env: "ManagerBasedRLEnv",
+    asset_cfg: SceneEntityCfg = DEFAULT_FOOT_BODY_CFG,
+    velocity_scale: float = 1.0,
+) -> torch.Tensor:
+    """Penalize side-shuffling foot velocity while leaving forward swing free."""
+
+    asset = env.scene[asset_cfg.name]
+    _, foot_vel_w = _foot_pos_vel(env, asset_cfg)
+    foot_vel_b = _yaw_rotate_inverse(asset, foot_vel_w[..., :3])
+    return torch.sum(torch.square(foot_vel_b[..., 1] / velocity_scale), dim=-1)
+
+
+def hip_deviation(
+    env: "ManagerBasedRLEnv",
+    asset_cfg: SceneEntityCfg = DEFAULT_CONTROLLED_JOINT_CFG,
+    joint_weight: float = 1.0,
+    velocity_weight: float = 0.05,
+) -> torch.Tensor:
+    """Penalize excessive hip yaw/roll use that often creates bow-legged gaits."""
+
+    asset = env.scene[asset_cfg.name]
+    joint_error = asset.data.joint_pos.torch[:, asset_cfg.joint_ids] - asset.data.default_joint_pos.torch[:, asset_cfg.joint_ids]
+    joint_vel = asset.data.joint_vel.torch[:, asset_cfg.joint_ids]
+    return joint_weight * torch.sum(torch.square(joint_error), dim=-1) + velocity_weight * torch.sum(
+        torch.square(joint_vel), dim=-1
+    )
 
 
 def default_joint_tracking(

@@ -18,8 +18,11 @@ from rewards import (
     double_support,
     energy_cost,
     foot_height_tracking,
+    foot_lateral_tracking,
+    foot_lateral_velocity,
     foot_velocity_tracking,
     forward_progress,
+    hip_deviation,
     large_contact,
     lin_velocity_tracking,
     periodic_force,
@@ -60,6 +63,7 @@ def _mock_env(num_envs=1):
             root_ang_vel_b=SimpleNamespace(torch=torch.zeros(num_envs, 3)),
             projected_gravity_b=SimpleNamespace(torch=torch.zeros(num_envs, 3)),
             root_pos_w=SimpleNamespace(torch=torch.tensor([[0.0, 0.0, 0.7]]).repeat(num_envs, 1)),
+            root_quat_w=SimpleNamespace(torch=torch.tensor([[0.0, 0.0, 0.0, 1.0]]).repeat(num_envs, 1)),
             body_link_pose_w=SimpleNamespace(torch=torch.zeros(num_envs, 2, 7)),
             body_link_vel_w=SimpleNamespace(torch=torch.zeros(num_envs, 2, 6)),
             body_lin_acc_w=SimpleNamespace(torch=torch.zeros(num_envs, 2, 6)),
@@ -166,6 +170,26 @@ def test_foot_tracking_uses_gait_references_for_swing_foot():
     assert torch.allclose(foot_velocity_tracking(env, gait_cfg=gait_cfg, asset_cfg=asset_cfg), torch.ones(1), atol=1e-6)
 
 
+def test_foot_lateral_tracking_rewards_narrow_body_frame_corridor():
+    env = _mock_env()
+    asset_cfg = SceneEntityCfg("robot", body_ids=[0, 1])
+    env.scene["robot"].data.body_link_pose_w.torch[:, 0, :3] = torch.tensor([[0.0, 0.11, 0.0]])
+    env.scene["robot"].data.body_link_pose_w.torch[:, 1, :3] = torch.tensor([[0.0, -0.11, 0.0]])
+
+    assert torch.allclose(foot_lateral_tracking(env, asset_cfg=asset_cfg), torch.ones(1), atol=1e-6)
+
+    env.scene["robot"].data.body_link_pose_w.torch[:, 0, 1] = 0.35
+    assert foot_lateral_tracking(env, asset_cfg=asset_cfg).item() < 0.2
+
+
+def test_foot_lateral_velocity_penalizes_side_shuffle_only():
+    env = _mock_env()
+    asset_cfg = SceneEntityCfg("robot", body_ids=[0, 1])
+    env.scene["robot"].data.body_link_vel_w.torch[:, :, :3] = torch.tensor([[[2.0, 0.5, 1.0], [3.0, -0.25, 2.0]]])
+
+    assert torch.allclose(foot_lateral_velocity(env, asset_cfg=asset_cfg), torch.tensor([0.3125]))
+
+
 def test_regularization_terms_return_expected_costs():
     env = _mock_env()
     asset_cfg = SceneEntityCfg("robot", joint_ids=[0, 1])
@@ -173,6 +197,10 @@ def test_regularization_terms_return_expected_costs():
     assert torch.allclose(default_joint_tracking(env, asset_cfg=asset_cfg), torch.ones(1))
     assert torch.allclose(energy_cost(env, asset_cfg=asset_cfg), torch.tensor([4.0]))
     assert torch.allclose(action_smoothness(env), torch.tensor([5.0]))
+
+    env.scene["robot"].data.joint_pos.torch[:] = torch.tensor([[0.5, -0.25]])
+    env.scene["robot"].data.joint_vel.torch[:] = torch.tensor([[2.0, 1.0]])
+    assert torch.allclose(hip_deviation(env, asset_cfg=asset_cfg, velocity_weight=0.1), torch.tensor([0.8125]))
 
 
 def test_feet_movement_penalizes_only_vertical_foot_motion():

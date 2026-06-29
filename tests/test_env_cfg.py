@@ -50,6 +50,9 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
     assert cfg.rewards.commanded_swing_air_time.params["max_air_time"] == 0.6
     assert cfg.rewards.foot_height_tracking.weight == 0.3
     assert cfg.rewards.foot_velocity_tracking.weight == 0.2
+    assert cfg.rewards.foot_lateral_tracking.weight == 0.5
+    assert cfg.rewards.foot_lateral_velocity.weight == -0.02
+    assert cfg.rewards.hip_deviation.weight == -0.03
     assert cfg.rewards.default_joint_tracking.weight == 0.02
     assert cfg.rewards.action_smoothness.weight == -0.0002
     assert cfg.rewards.energy_cost.weight == -0.00003

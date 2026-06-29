@@ -237,6 +237,9 @@ The DWL default direction is to keep `base_lin_vel` and `height_scan` out of the
 - `periodic_velocity`: Rewards movement of the foot currently expected to be in swing.
 - `foot_height_tracking`: Tracks the quintic swing-foot height reference.
 - `foot_velocity_tracking`: Tracks the quintic swing-foot vertical velocity reference.
+- `foot_lateral_tracking`: Rewards a narrow body-frame left/right foot corridor to discourage wide A-frame walking.
+- `foot_lateral_velocity`: Penalizes side-shuffling foot velocity while leaving forward swing motion free.
+- `hip_deviation`: Penalizes excessive hip yaw/roll displacement and velocity, targeting bow-legged gait artifacts.
 - `default_joint_tracking`: Rewards staying near the default controlled-joint posture.
 - `energy_cost`: Computes `sum(|tau| * |qdot|)`.
 - `action_smoothness`: Computes the second-order action difference.
@@ -394,6 +397,15 @@ The implementation keeps `orientation_tracking` and `base_height_tracking`
 enabled as low-weight guardrails so the policy cannot earn forward reward by
 falling forward. Tests were added for yaw warmup, reward wiring,
 `forward_progress`, and commanded swing air-time gating/touchdown behavior.
+
+### Gait Shape Regularization
+
+The first walking policy reached positive terrain curriculum but learned an
+awkward wide, A-frame gait. Three focused gait-shape terms were added:
+`foot_lateral_tracking` keeps feet near a narrow body-frame corridor,
+`foot_lateral_velocity` discourages side-shuffling, and `hip_deviation`
+specifically regularizes hip yaw/roll use. These are intentionally moderate so
+forward velocity and terrain promotion still dominate the task.
 
 Next check: run a short 1024-env training job and confirm `base_contact` drops,
 episode length increases, and the robot can survive the initial contact while

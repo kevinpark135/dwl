@@ -202,6 +202,25 @@ class G1Rewards(RewardsCfg):
         weight=0.2,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "tolerance": 3.0},
     )
+    foot_lateral_tracking = RewTerm(
+        func=dwl_rewards.foot_lateral_tracking,
+        weight=0.5,
+        params={"asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "target_width": 0.22, "tolerance": 40.0},
+    )
+    foot_lateral_velocity = RewTerm(
+        func=dwl_rewards.foot_lateral_velocity,
+        weight=-0.02,
+        params={"asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "velocity_scale": 1.0},
+    )
+    hip_deviation = RewTerm(
+        func=dwl_rewards.hip_deviation,
+        weight=-0.03,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_hip_yaw_joint", ".*_hip_roll_joint"]),
+            "joint_weight": 1.0,
+            "velocity_weight": 0.03,
+        },
+    )
     default_joint_tracking = RewTerm(
         func=dwl_rewards.default_joint_tracking,
         weight=0.02,
