@@ -51,7 +51,7 @@ dwl/
 - `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration and will later point to the DWL custom model/algorithm/runner.
 - `rsl_rl/__init__.py`: Marks the local RSL-RL extension package for DWL.
 - `rsl_rl/dwl_model.py`: RSL-RL-compatible DWL actor/critic modules with a GRU encoder, latent decoder, actor head, and privileged critic.
-- `rsl_rl/dwl_ppo.py`: Placeholder for PPO with DWL denoising and latent regularization losses.
+- `rsl_rl/dwl_ppo.py`: RSL-RL PPO extension that adds DWL decoder reconstruction and latent L1 losses.
 - `rsl_rl/dwl_runner.py`: Placeholder for the runner that wires Isaac Lab observation groups into the DWL training loop.
 - `tests/test_gait.py`: Regression tests for gait phase wrapping, clock inputs, stance masks, and quintic foot references.
 - `tests/test_actions.py`: Regression tests for DWL action delay and motor target offset processing.
@@ -194,11 +194,11 @@ Implemented helpers:
 - `events.py`: DWL DR buffers and all paper-named domain randomization event helpers.
 - `dwl_env_cfg.py`: Wires DWL observations, rewards, event helpers, observation noise, and 12-DoF leg actions into the G1 task.
 - `rsl_rl/dwl_model.py`: Feed-forward RSL-RL model surface with a finite-history GRU encoder, latent actor, decoder reconstruction head, and privileged critic.
+- `rsl_rl/dwl_ppo.py`: PPO update loop with decoder reconstruction MSE and latent L1 auxiliary losses.
 - `tests/`: Regression tests for gait, observation, and reward conventions.
 
 ## Remaining Implementation Order
 
-1. Implement `rsl_rl/dwl_ppo.py` by adding reconstruction and latent L1 losses to PPO.
-2. Implement `rsl_rl/dwl_runner.py` to pass privileged reconstruction targets through rollout and training.
-3. Update `agents/rsl_rl_ppo_cfg.py` with DWL architecture paths and paper-aligned hyperparameters.
-4. Train and compare the DWL policy against the current PPO baseline.
+1. Implement `rsl_rl/dwl_runner.py` to pass privileged reconstruction targets through rollout and training.
+2. Update `agents/rsl_rl_ppo_cfg.py` with DWL architecture paths and paper-aligned hyperparameters.
+3. Train and compare the DWL policy against the current PPO baseline.
