@@ -325,8 +325,30 @@ stability aids.
 Restored terrain initialization to `max_init_terrain_level = 5` and marked it as
 fixed for future debugging. To let the robot catch itself after spawn, the G1
 soft joint position limit factor was raised to `1.0`, action scale was restored
-to `0.5`, initial action std was set to `0.35`, leg/ankle damping was increased,
-and motor strength/PD randomization was frozen at `1.0`.
+to `0.5`, and leg/ankle damping was increased.
+
+### Motion and Domain Randomization Reopened
+
+The robot was still too passive after spawn, so the cfg now encourages immediate
+joint use again. Observation corruption, reset noise, friction randomization,
+system delay, motor offset, motor strength randomization, and PD randomization
+were restored; initial action std was raised to `0.8`, entropy to `0.006`, and
+the remaining stand-still rewards were reduced to weak stability aids.
+
+### Exploration Boost
+
+The robot still kept its legs too quiet after spawn. Action scale, initial action
+std, and entropy were raised; zero forward commands were removed; gait/foot
+tracking rewards were strengthened; and default-pose, smoothness, energy, and
+foot-acceleration penalties were weakened so early rollouts actively try joint
+motion.
+
+### Immediate Action Fix
+
+The robot still tipped before visible leg response. The DWL action reset now
+restores default joint targets instead of zero targets, startup action delay is
+disabled for this phase, and gait/action exploration was raised again so the
+first sampled actions can reach the legs immediately.
 
 Next check: run a short 1024-env training job and confirm `base_contact` drops,
 episode length increases, and the robot can survive the initial contact while

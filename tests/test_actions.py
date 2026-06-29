@@ -13,7 +13,9 @@ class MockAsset:
     def __init__(self):
         self.device = torch.device("cpu")
         self.num_joints = 2
-        self.data = SimpleNamespace(default_joint_pos=SimpleNamespace(torch=torch.zeros(2, 2)))
+        self.data = SimpleNamespace(
+            default_joint_pos=SimpleNamespace(torch=torch.tensor([[0.1, -0.2], [0.3, -0.4]]))
+        )
         self.position_target = None
         self.position_target_joint_ids = None
 
@@ -56,10 +58,27 @@ def test_dwl_joint_position_action_delays_actions_and_adds_motor_offset():
 
     action.process_actions(torch.tensor([[1.0, 2.0], [3.0, 4.0]]))
 
-    assert torch.allclose(action.processed_actions, torch.tensor([[0.1, 0.2], [3.3, 4.4]]))
+    assert torch.allclose(action.processed_actions, torch.tensor([[0.2, 0.0], [3.6, 4.0]]))
 
     action.process_actions(torch.tensor([[5.0, 6.0], [7.0, 8.0]]))
     action.apply_actions()
 
-    assert torch.allclose(env.scene["robot"].position_target, torch.tensor([[1.1, 2.2], [7.3, 8.4]]))
+    assert torch.allclose(env.scene["robot"].position_target, torch.tensor([[1.2, 2.0], [7.6, 8.0]]))
     assert env.scene["robot"].position_target_joint_ids == slice(None)
+
+
+def test_dwl_joint_position_action_reset_restores_default_joint_targets():
+    env = _mock_env()
+    cfg = DwlJointPositionActionCfg(
+        asset_name="robot",
+        joint_names=[".*"],
+        scale=1.0,
+        use_default_offset=True,
+        max_delay_steps=2,
+    )
+    action = DwlJointPositionAction(cfg, env)
+    action.process_actions(torch.ones(2, 2))
+
+    action.reset([0])
+
+    assert torch.allclose(action.processed_actions[0], env.scene["robot"].data.default_joint_pos.torch[0])

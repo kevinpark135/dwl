@@ -59,7 +59,10 @@ class DwlJointPositionAction(JointPositionAction):
         if env_ids is None:
             env_ids = slice(None)
         self._raw_actions[env_ids] = 0.0
-        self._processed_actions[env_ids] = 0.0
+        if torch.is_tensor(self._offset):
+            self._processed_actions[env_ids] = self._offset[env_ids]
+        else:
+            self._processed_actions[env_ids] = self._offset
         self._action_history[env_ids] = 0.0
 
     def _delayed_actions(self) -> torch.Tensor:
