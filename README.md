@@ -119,7 +119,7 @@ Core task files:
 Training configuration:
 
 - `agents/__init__.py`: Marks the agent configuration package.
-- `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration for DWL and the proprioception-only baseline. DWL uses Isaac Lab's stock `OnPolicyRunner` entrypoint with fully-qualified custom actor, critic, and PPO class names.
+- `agents/rsl_rl_ppo_cfg.py`: Holds the RSL-RL training configuration for DWL and the proprioception-only baseline. DWL uses the custom `DwlRunner` with local `DwlActorModel`, `DwlCriticModel`, and `DwlPPO` class names.
 - `scripts/`: Holds baseline training pipeline
 
 RSL-RL extension files:
@@ -127,7 +127,7 @@ RSL-RL extension files:
 - `rsl_rl/__init__.py`: Marks the local RSL-RL extension package for DWL.
 - `rsl_rl/dwl_model.py`: Defines the DWL actor/critic modules with GRU history encoding, latent decoding, actor head, and privileged critic.
 - `rsl_rl/dwl_ppo.py`: Extends PPO with DWL decoder reconstruction and latent L1 losses.
-- `rsl_rl/dwl_runner.py`: Optional helper module for preparing DWL observation groups and validating privileged decoder targets. The default Isaac Lab train CLI now runs through `OnPolicyRunner`.
+- `rsl_rl/dwl_runner.py`: Custom runner for preparing DWL observation groups and validating privileged decoder targets. The default DWL train cfg now runs through `DwlRunner`.
 
 Other:
 
@@ -274,3 +274,102 @@ converted to `int32`.
 The DWL train cfg starts terrain curriculum at `max_init_terrain_level = 0` so
 the randomly initialized policy first sees easier terrain instead of immediately
 falling on high-level rough patches.
+
+## Update Log
+
+This log records the major debug attempts and fixes. It intentionally skips
+small cleanup edits and test-only churn.
+
+### Training Pipeline and Baseline Setup
+
+After the first end-to-end training attempts, the repo was organized as an
+Isaac Lab task package with registered DWL train/play tasks and a
+proprioception-only G1 baseline. The README train/play commands were added so
+short smoke tests, 1024-env debug runs, and full 4096-env runs can be launched
+from the local Isaac Lab checkout without reconstructing CLI flags each time.
+
+The baseline task removes external height-scan input from the policy while
+keeping the stock G1 PPO reward stack. This gives a control run for separating
+DWL-specific model/reward issues from ordinary G1 locomotion issues.
+
+### Startup and Import-Crash Fixes
+
+Early Isaac Sim startup attempts exposed crashes caused by importing runtime
+Isaac Sim/USD pieces too early during config parsing. The action implementation
+was split into `actions.py` for lightweight config/helper code and
+`action_terms.py` for the runtime `DwlJointPositionAction` class. The action
+config now points to the runtime class through a lazy fully-qualified
+`class_type` reference.
+
+This preserved the DWL action behavior while avoiding premature `pxr`/USD
+imports before `SimulationApp` starts.
+
+### DWL Observation, Runner, and Decoder Wiring
+
+After wiring the DWL actor/critic/decoder path, the observation groups were
+split into policy-only proprioception and privileged simulator state. Policy
+observations use history and delay buffers, while privileged observations remain
+immediate critic/decoder targets.
+
+The custom `DwlRunner` was added to preserve and validate decoder target
+observations during rollout. A later cfg audit found the train config had drifted
+back toward `OnPolicyRunner` and long package-path class names, so the runner cfg
+was corrected to use `DwlRunner`, `DwlActorModel`, `DwlCriticModel`, and
+`DwlPPO` directly. Actor and critic observation normalization were also enabled
+to improve early PPO conditioning.
+
+### Isaac Lab 3.0 Compatibility and Reward Corrections
+
+Several fixes came from Isaac Lab 3.0 API mismatches and unstable reward scales:
+
+- Event helpers were updated to use Isaac Lab's `env_ids` event signature, and
+  simulation index tensors passed back to PhysX/Warp APIs are converted to
+  `int32`.
+- Foot movement regularization was changed to use `body_lin_acc_w`; only vertical
+  foot velocity/acceleration is penalized, and vertical acceleration is scaled by
+  `10.0` before squaring so SI-unit accelerations do not dominate early learning.
+- Foot velocity tracking was fixed so the swing-foot vertical velocity reward
+  matches the shared gait reference instead of silently scoring the wrong motion.
+- Observation-noise event helpers now accept `env_ids=None`, which keeps them
+  compatible with Isaac Lab event hooks and direct debug/test calls.
+
+### Initial Pose and Terrain Curriculum
+
+When early training runs collapsed quickly, the reset distribution was tightened
+around the precise G1 default pose: small base pose/velocity noise and small
+controlled-joint position/velocity noise. The terrain curriculum start was set
+to `max_init_terrain_level = 0` so an untrained policy first sees easy terrain.
+
+This fixed the avoidable rough-terrain and large-reset perturbation failure mode,
+but it did not fully solve the later 1024-env training issue where `base_contact`
+stayed near 1.0 and success rate stayed 0.
+
+### Warm-Start Fix for 1024-Env Collapse
+
+After a 1024-env, 500-iteration run still showed persistent torso/base contact,
+zero success rate, and poor balance immediately after spawn, the problem was
+treated as an early-learning difficulty issue rather than a terrain spawn issue.
+The current train cfg is now a warm-start version intended to make standing and
+short forward motion learnable before restoring harder DWL randomization.
+
+Implemented warm-start changes:
+
+- Balance rewards were strengthened: orientation and base-height tracking were
+  increased, default-joint tracking was raised, and termination penalty was
+  reduced from `-200` to `-100`.
+- Phase/gait rewards were weakened for initial learning: periodic force,
+  periodic velocity, foot-height tracking, and foot-velocity tracking now have
+  lower weights so the policy is not strongly forced into alternating swing
+  behavior before it can stand.
+- Terrain starts at level 0, command ranges are narrower
+  (`lin_vel_x = 0.0..0.5`, `ang_vel_z = -0.5..0.5`), and lateral velocity remains
+  zero.
+- Domain randomization was softened for the warm-start stage: friction is
+  narrowed to `0.8..1.2`, payload mass randomization is disabled, delay is set to
+  zero, motor target offset is set to zero, and interval pushes currently sample
+  zero force/torque.
+
+The next intended check is whether `Episode_Termination/base_contact` drops and
+episode length increases in a short 1024-env run. If that happens, friction,
+delay, motor offsets, pushes, and stronger gait-prior weights can be restored
+gradually instead of all at once.

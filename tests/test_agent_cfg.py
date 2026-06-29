@@ -22,7 +22,9 @@ def test_dwl_agent_cfg_points_to_dwl_runner_model_and_algorithm():
     assert cfg.actor.encoder_hidden_dim == 128
     assert cfg.actor.latent_dim == 64
     assert cfg.actor.decoder_obs_set == "critic"
+    assert cfg.actor.obs_normalization
     assert cfg.critic.class_name == "DwlCriticModel"
+    assert cfg.critic.obs_normalization
     assert cfg.algorithm.class_name == "DwlPPO"
     assert cfg.algorithm.reconstruction_loss_coef == 1.0
     assert cfg.algorithm.latent_l1_loss_coef == 1.0e-3

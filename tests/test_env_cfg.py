@@ -27,7 +27,7 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
     assert cfg.actions.joint_pos.joint_names == CONTROLLED_LEG_JOINT_NAMES
     assert cfg.actions.joint_pos.max_delay_steps == 4
     assert cfg.rewards.lin_velocity_tracking.weight == 1.0
-    assert cfg.rewards.periodic_force.weight == 1.0
+    assert cfg.rewards.periodic_force.weight == 0.2
     assert cfg.rewards.track_lin_vel_xy_exp is None
     assert cfg.rewards.dof_torques_l2 is None
 
@@ -36,20 +36,21 @@ def test_dwl_env_cfg_wires_dwl_events():
     cfg = G1DwlEnvCfg()
 
     assert cfg.events.init_dwl_buffers is not None
-    assert cfg.events.store_friction.params["friction_range"] == (0.2, 2.0)
-    assert cfg.events.physics_material.params["static_friction_range"] == (0.2, 2.0)
+    assert cfg.events.store_friction.params["friction_range"] == (0.8, 1.2)
+    assert cfg.events.physics_material.params["static_friction_range"] == (0.8, 1.2)
     assert cfg.events.reset_robot_joints.params["position_range"] == (-0.05, 0.05)
     assert cfg.events.reset_robot_joints.params["velocity_range"] == (-0.1, 0.1)
     assert cfg.events.reset_base.params["pose_range"]["yaw"] == (-0.1, 0.1)
     assert cfg.events.reset_base.params["velocity_range"]["roll"] == (-0.05, 0.05)
     assert cfg.scene.terrain.max_init_terrain_level == 0
     assert cfg.rewards.feet_movement.params["acceleration_scale"] == 10.0
-    assert cfg.events.system_delay.params["delay_range_s"] == (0.0, 0.01)
-    assert cfg.events.motor_offset.params["offset_range"] == (-0.05, 0.05)
+    assert cfg.events.system_delay.params["delay_range_s"] == (0.0, 0.0)
+    assert cfg.events.motor_offset.params["offset_range"] == (0.0, 0.0)
     assert cfg.events.motor_strength.params["strength_distribution_params"] == (0.9, 1.1)
     assert cfg.events.pd_factors.params["pd_factor_distribution_params"] == (0.8, 1.2)
     assert cfg.events.joint_position_observation_noise.params["noise_range"] == (-0.3, 0.3)
     assert cfg.events.push_force_torques is not None
+    assert cfg.events.push_force_torques.params["force_range"] == (0.0, 0.0)
 
 
 def test_play_cfg_disables_policy_noise_and_push_wrenches():

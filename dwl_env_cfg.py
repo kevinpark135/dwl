@@ -121,7 +121,7 @@ class G1Observations:
 class G1Rewards(RewardsCfg):
     """Reward terms for the MDP."""
 
-    termination_penalty = RewTerm(func=mdp.is_terminated, weight=-200.0)
+    termination_penalty = RewTerm(func=mdp.is_terminated, weight=-100.0)
     lin_velocity_tracking = RewTerm(
         func=dwl_rewards.lin_velocity_tracking,
         weight=1.0,
@@ -132,35 +132,35 @@ class G1Rewards(RewardsCfg):
         weight=1.0,
         params={"command_name": "base_velocity", "tolerance": 7.0},
     )
-    orientation_tracking = RewTerm(func=dwl_rewards.orientation_tracking, weight=1.0, params={"tolerance": 5.0})
+    orientation_tracking = RewTerm(func=dwl_rewards.orientation_tracking, weight=2.0, params={"tolerance": 5.0})
     base_height_tracking = RewTerm(
         func=dwl_rewards.base_height_tracking,
-        weight=0.5,
+        weight=2.0,
         params={"target_height": 0.7, "tolerance": 10.0},
     )
     periodic_force = RewTerm(
         func=dwl_rewards.periodic_force,
-        weight=1.0,
+        weight=0.2,
         params={"gait_cfg": DwlGaitCfg(), "sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG},
     )
     periodic_velocity = RewTerm(
         func=dwl_rewards.periodic_velocity,
-        weight=1.0,
+        weight=0.1,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG},
     )
     foot_height_tracking = RewTerm(
         func=dwl_rewards.foot_height_tracking,
-        weight=1.0,
+        weight=0.2,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "tolerance": 5.0},
     )
     foot_velocity_tracking = RewTerm(
         func=dwl_rewards.foot_velocity_tracking,
-        weight=0.5,
+        weight=0.1,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "tolerance": 3.0},
     )
     default_joint_tracking = RewTerm(
         func=dwl_rewards.default_joint_tracking,
-        weight=0.2,
+        weight=0.5,
         params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG, "tolerance": 2.0},
     )
     energy_cost = RewTerm(
@@ -168,7 +168,7 @@ class G1Rewards(RewardsCfg):
         weight=-0.0001,
         params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG},
     )
-    action_smoothness = RewTerm(func=dwl_rewards.action_smoothness, weight=-0.01)
+    action_smoothness = RewTerm(func=dwl_rewards.action_smoothness, weight=-0.005)
     feet_movement = RewTerm(
         func=dwl_rewards.feet_movement,
         weight=-0.01,
@@ -198,7 +198,7 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.scene.robot.init_state.pos = (0.0, 0.0, 0.74)
         self.scene.robot.init_state.rot = (0.0, 0.0, 0.0, 1.0)
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/torso_link"
-        self.scene.terrain.max_init_terrain_level = 5
+        self.scene.terrain.max_init_terrain_level = 0
         self.actions.joint_pos = dwl_actions.DwlJointPositionActionCfg(
             asset_name="robot",
             joint_names=dwl_obs.CONTROLLED_LEG_JOINT_NAMES,
@@ -212,7 +212,7 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.events.store_friction = EventTerm(
             func=dwl_events.store_friction,
             mode="startup",
-            params={"friction_range": (0.2, 2.0)},
+            params={"friction_range": (0.8, 1.2)},
         )
         self.events.joint_position_observation_noise = EventTerm(
             func=dwl_events.randomize_joint_position_observation_noise,
@@ -237,12 +237,12 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.events.system_delay = EventTerm(
             func=dwl_events.randomize_system_delay,
             mode="startup",
-            params={"delay_range_s": (0.0, 0.01)},
+            params={"delay_range_s": (0.0, 0.0)},
         )
         self.events.motor_offset = EventTerm(
             func=dwl_events.randomize_motor_offset,
             mode="startup",
-            params={"offset_range": (-0.05, 0.05), "asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG},
+            params={"offset_range": (0.0, 0.0), "asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG},
         )
         self.events.motor_strength = EventTerm(
             func=dwl_events.randomize_motor_strength,
@@ -260,16 +260,9 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
                 "asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG,
             },
         )
-        self.events.physics_material.params["static_friction_range"] = (0.2, 2.0)
-        self.events.physics_material.params["dynamic_friction_range"] = (0.2, 2.0)
-        self.events.add_base_mass = EventTerm(
-            func=dwl_events.randomize_body_mass,
-            mode="startup",
-            params={
-                "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
-                "mass_distribution_params": (-5.0, 20.0),
-            },
-        )
+        self.events.physics_material.params["static_friction_range"] = (0.8, 1.2)
+        self.events.physics_material.params["dynamic_friction_range"] = (0.8, 1.2)
+        self.events.add_base_mass = None
         self.events.base_com = None
         self.events.clear_push_force_torques = EventTerm(func=dwl_events.clear_push_force_torques, mode="reset")
         self.events.base_external_force_torque = EventTerm(
@@ -296,8 +289,8 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
             interval_range_s=(10.0, 15.0),
             params={
                 "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
-                "force_range": (-50.0, 50.0),
-                "torque_range": (-10.0, 10.0),
+                "force_range": (0.0, 0.0),
+                "torque_range": (0.0, 0.0),
             },
         )
         self.events.push_robot = None
@@ -316,9 +309,9 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.rewards.dof_pos_limits = None
 
         # Commands
-        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 0.5)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
-        self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
+        self.commands.base_velocity.ranges.ang_vel_z = (-0.5, 0.5)
 
         # Start close to the precise G1 default pose. The stock rough task uses a
         # wide reset distribution, but large initial joint/base perturbations make
