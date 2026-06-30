@@ -285,36 +285,34 @@ curriculum can promote the policy after it learns stable forward translation.
 Major changes only. The notes keep the trial-and-error path visible without
 listing every small constant change.
 
-- Initial DWL wiring: Registered DWL train/play tasks, split import-safe action
-  config from runtime action code, separated policy observations from privileged
-  critic/decoder state, and wired the custom DWL actor/critic/PPO path. This
-  established the task scaffold before gait tuning.
-- Isaac Lab 3.0 compatibility pass: Updated event signatures, reward APIs,
-  PhysX/Warp index dtypes, and vertical foot-acceleration handling so the task
-  could run cleanly on the local Isaac Lab 3.0 checkout.
 - Early stand-up debugging: Initial rollouts collapsed or contacted the torso
   too quickly, so reset noise, friction/push randomization, actuator damping,
   joint limits, and action initialization were softened in stages. A pure
   stand-first setup was tried, then backed out because it encouraged staying
   upright instead of walking.
+
 - Exploration and local-optimum removal (`fce87ae`, `0809d43`, `6f8308a`):
   Zero/low forward commands and strong stability rewards created a passive
   crouch or upright no-translation solution. The reward balance moved toward
   forward velocity, capped forward progress, commanded swing air-time, and
   weaker default/smoothness/energy penalties so the policy had a reason to
   move both legs.
+
 - Paper dimension alignment (`6dbc9eb`): Matched the DWL model and PPO path to
   the paper tables: encoder input, privileged decoder/critic state, height scan,
   network widths, and PPO coefficients were brought into the expected shape.
+
 - Straight-walk curriculum (`24f3878`, `6f8308a`): Yaw learning was staged
   because early turning made the biped exploit circular motion before learning
   stable forward walking. Actor observations, privileged observations, and
   `ang_velocity_tracking` use the same yaw target so policy and reward do not
   disagree during the straight-walk phase.
+
 - First gait-shape pass (`418896c`): The first walking policy reached positive
   terrain curriculum but looked wide and A-framed. Lateral foot-corridor,
   side-shuffle, and hip yaw/roll regularization were added to narrow the stance
   while keeping forward velocity dominant.
+  
 - Human-like gait refinement (`8ae54cb`): Visual checks showed a wide stance,
   high cadence, one-foot pivoting, circular drift, and stiff raised arms. The
   gait clock was slowed to a `1.2s` cycle, target foot width was narrowed to
