@@ -147,11 +147,6 @@ class G1Rewards(RewardsCfg):
         weight=-0.01,
         params={"asset_cfg": dwl_obs.DEFAULT_ROBOT_CFG},
     )
-    double_support = RewTerm(
-        func=dwl_rewards.double_support,
-        weight=0.0,
-        params={"sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG},
-    )
     lin_velocity_tracking = RewTerm(
         func=dwl_rewards.lin_velocity_tracking,
         weight=4.0,
@@ -177,6 +172,17 @@ class G1Rewards(RewardsCfg):
         weight=1.0,
         params={"command_name": "base_velocity", "min_command_x": 0.2},
     )
+    low_forward_speed_penalty = RewTerm(
+        func=dwl_rewards.low_forward_speed_penalty,
+        weight=-0.5,
+        params={
+            "command_name": "base_velocity",
+            "min_command_x": 0.2,
+            "min_forward_speed": 0.2,
+            "grace_period_s": 0.5,
+            "asset_cfg": dwl_obs.DEFAULT_ROBOT_CFG,
+        },
+    )
     orientation_tracking = RewTerm(func=dwl_rewards.orientation_tracking, weight=1.0, params={"tolerance": 5.0})
     base_height_tracking = RewTerm(
         func=dwl_rewards.base_height_tracking,
@@ -195,13 +201,15 @@ class G1Rewards(RewardsCfg):
     )
     commanded_swing_air_time = RewTerm(
         func=dwl_rewards.commanded_swing_air_time,
-        weight=0.7,
+        weight=0.4,
         params={
             "command_name": "base_velocity",
             "gait_cfg": DwlGaitCfg(),
             "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG,
             "sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG,
             "min_command_x": 0.2,
+            "min_forward_speed": 0.15,
+            "max_tilt": 0.55,
             "clearance_height": 0.07,
             "target_air_time": 0.4,
             "max_air_time": 0.8,
@@ -281,6 +289,11 @@ class G1Rewards(RewardsCfg):
         func=dwl_rewards.large_contact,
         weight=-0.01,
         params={"sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG},
+    )
+    body_contact = RewTerm(
+        func=dwl_rewards.body_contact,
+        weight=-5.0,
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names="torso_link")},
     )
 
 
@@ -447,7 +460,7 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         # to move their legs instead of discovering a passive crouch.
         self.commands.base_velocity.ranges.lin_vel_x = (0.5, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
-        self.commands.base_velocity.ranges.ang_vel_z = (-0.4, 0.4)
+        self.commands.base_velocity.ranges.ang_vel_z = (0.0, 0.0)
 
         # Start close to the precise G1 default pose. The stock rough task uses a
         # wide reset distribution, but large initial joint/base perturbations make
@@ -486,7 +499,7 @@ class G1DwlEnvCfg_PLAY(G1DwlEnvCfg):
 
         self.commands.base_velocity.ranges.lin_vel_x = (1.0, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
-        self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
+        self.commands.base_velocity.ranges.ang_vel_z = (0.0, 0.0)
         self.commands.base_velocity.ranges.heading = (0.0, 0.0)
         # disable randomization for play
         self.observations.policy.enable_corruption = False

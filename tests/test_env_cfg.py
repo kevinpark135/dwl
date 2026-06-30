@@ -39,7 +39,6 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
     assert cfg.scene.robot.actuators["legs"].damping[".*_knee_joint"] == 12.0
     assert cfg.scene.robot.actuators["feet"].damping == 8.0
     assert cfg.rewards.alive.weight == 0.05
-    assert cfg.rewards.double_support.weight == 0.0
     assert cfg.rewards.base_motion_penalty.weight == -0.01
     assert cfg.rewards.lin_velocity_tracking.weight == 4.0
     assert cfg.rewards.lin_velocity_tracking.params["tolerance"] == 2.5
@@ -50,9 +49,14 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
     assert cfg.rewards.yaw_drift_penalty.weight == -0.15
     assert cfg.rewards.yaw_drift_penalty.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
     assert cfg.rewards.forward_progress.weight == 1.0
+    assert cfg.rewards.low_forward_speed_penalty.weight == -0.5
+    assert cfg.rewards.low_forward_speed_penalty.params["min_forward_speed"] == 0.2
+    assert cfg.rewards.low_forward_speed_penalty.params["grace_period_s"] == 0.5
     assert cfg.rewards.periodic_force.weight == 0.6
     assert cfg.rewards.periodic_velocity.weight == 1.0
-    assert cfg.rewards.commanded_swing_air_time.weight == 0.7
+    assert cfg.rewards.commanded_swing_air_time.weight == 0.4
+    assert cfg.rewards.commanded_swing_air_time.params["min_forward_speed"] == 0.15
+    assert cfg.rewards.commanded_swing_air_time.params["max_tilt"] == 0.55
     assert cfg.rewards.commanded_swing_air_time.params["target_air_time"] == 0.4
     assert cfg.rewards.commanded_swing_air_time.params["max_air_time"] == 0.8
     assert cfg.rewards.foot_height_tracking.weight == 0.3
@@ -68,6 +72,8 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
     assert cfg.rewards.action_smoothness.weight == -0.0002
     assert cfg.rewards.energy_cost.weight == -0.00003
     assert cfg.rewards.feet_movement.weight == -0.0005
+    assert cfg.rewards.body_contact.weight == -5.0
+    assert cfg.rewards.body_contact.params["sensor_cfg"].body_names == "torso_link"
     assert cfg.rewards.track_lin_vel_xy_exp is None
     assert cfg.rewards.dof_torques_l2 is None
 
@@ -81,7 +87,7 @@ def test_dwl_env_cfg_wires_dwl_events():
     assert cfg.events.reset_robot_joints.params["position_range"] == (-0.05, 0.05)
     assert cfg.events.reset_robot_joints.params["velocity_range"] == (-0.1, 0.1)
     assert cfg.commands.base_velocity.ranges.lin_vel_x == (0.5, 1.0)
-    assert cfg.commands.base_velocity.ranges.ang_vel_z == (-0.4, 0.4)
+    assert cfg.commands.base_velocity.ranges.ang_vel_z == (0.0, 0.0)
     assert cfg.scene.robot.init_state.joint_pos[".*_elbow_pitch_joint"] == 0.35
     assert cfg.events.reset_base.params["pose_range"]["yaw"] == (-0.1, 0.1)
     assert cfg.events.reset_base.params["velocity_range"]["roll"] == (-0.05, 0.05)

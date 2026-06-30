@@ -13,9 +13,9 @@ from rewards import (
     alive,
     base_height_tracking,
     base_motion_penalty,
+    body_contact,
     commanded_swing_air_time,
     default_joint_tracking,
-    double_support,
     energy_cost,
     foot_height_tracking,
     foot_lateral_tracking,
@@ -27,6 +27,7 @@ from rewards import (
     hip_deviation,
     large_contact,
     lin_velocity_tracking,
+    low_forward_speed_penalty,
     periodic_force,
     periodic_velocity,
     feet_movement,
@@ -112,13 +113,26 @@ def test_forward_progress_rewards_commanded_positive_body_velocity():
     assert torch.allclose(forward_progress(env), torch.zeros(1))
 
 
+def test_low_forward_speed_penalty_is_commanded_and_after_grace_period():
+    env = _mock_env()
+    env.command_manager.command = torch.tensor([[0.5, 0.0, 0.0]])
+    env.episode_length_buf[:] = 3
+    env.scene["robot"].data.root_lin_vel_b.torch[:, 0] = 0.1
+
+    assert torch.allclose(low_forward_speed_penalty(env, min_forward_speed=0.2), torch.tensor([0.25]))
+
+    env.episode_length_buf[:] = 1
+    assert torch.allclose(low_forward_speed_penalty(env, min_forward_speed=0.2), torch.zeros(1))
+
+    env.episode_length_buf[:] = 3
+    env.command_manager.command = torch.tensor([[0.1, 0.0, 0.0]])
+    assert torch.allclose(low_forward_speed_penalty(env, min_forward_speed=0.2), torch.zeros(1))
+
+
 def test_stability_rewards_ignore_commanded_horizontal_motion():
     env = _mock_env()
-    sensor_cfg = SceneEntityCfg("contact_forces", body_ids=[0, 1])
 
-    env.scene.sensors["contact_forces"].data.net_forces_w.torch[:, 1, 2] = 350.0
     assert torch.allclose(alive(env), torch.ones(1))
-    assert torch.allclose(double_support(env, sensor_cfg=sensor_cfg), torch.ones(1))
 
     env.scene["robot"].data.root_lin_vel_b.torch[:] = torch.tensor([[1.0, 2.0, 3.0]])
     env.scene["robot"].data.root_ang_vel_b.torch[:] = torch.tensor([[4.0, 5.0, 6.0]])
@@ -144,6 +158,7 @@ def test_commanded_swing_air_time_is_gated_by_forward_command_and_rewards_touchd
     env = _mock_env()
     env.episode_length_buf[:] = 1
     env.command_manager.command = torch.tensor([[0.5, 0.0, 0.0]])
+    env.scene["robot"].data.root_lin_vel_b.torch[:, 0] = 0.3
     env.scene["robot"].data.body_link_pose_w.torch[:, 1, 2] = 0.06
     env.scene.sensors["contact_forces"].data.net_forces_w.torch[:, 1, 2] = 0.0
     asset_cfg = SceneEntityCfg("robot", body_ids=[0, 1])
@@ -158,6 +173,13 @@ def test_commanded_swing_air_time_is_gated_by_forward_command_and_rewards_touchd
 
     env.command_manager.command = torch.zeros(1, 3)
     assert torch.allclose(commanded_swing_air_time(env, asset_cfg=asset_cfg, sensor_cfg=sensor_cfg), torch.zeros(1))
+
+    env.command_manager.command = torch.tensor([[0.5, 0.0, 0.0]])
+    env.scene["robot"].data.root_lin_vel_b.torch[:, 0] = 0.0
+    assert torch.allclose(
+        commanded_swing_air_time(env, asset_cfg=asset_cfg, sensor_cfg=sensor_cfg, min_forward_speed=0.15),
+        torch.zeros(1),
+    )
 
 
 def test_foot_tracking_uses_gait_references_for_swing_foot():
@@ -269,3 +291,12 @@ def test_large_contact_penalizes_force_above_threshold():
     sensor_cfg = SceneEntityCfg("contact_forces", body_ids=[0, 1])
 
     assert torch.allclose(large_contact(env, sensor_cfg=sensor_cfg), torch.tensor([50.0]))
+
+
+def test_body_contact_penalizes_non_foot_contact_events():
+    env = _mock_env()
+    env.scene.sensors["contact_forces"].data.net_forces_w.torch[:, 0, 2] = 0.5
+    env.scene.sensors["contact_forces"].data.net_forces_w.torch[:, 1, 2] = 2.0
+    sensor_cfg = SceneEntityCfg("contact_forces", body_ids=[0, 1])
+
+    assert torch.allclose(body_contact(env, sensor_cfg=sensor_cfg), torch.tensor([1.0]))

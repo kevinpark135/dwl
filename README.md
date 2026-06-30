@@ -229,8 +229,8 @@ The DWL default direction is to keep `base_lin_vel` and `height_scan` out of the
 `rewards.py` implements the DWL paper reward table as Isaac Lab reward terms:
 
 - `lin_velocity_tracking`: Tracks commanded base linear velocity with zero vertical command.
-- `lin_velocity_tracking_yaw_frame`: Compatibility wrapper for Isaac Lab's yaw-frame XY velocity tracking.
 - `ang_velocity_tracking`: Tracks commanded yaw rate while keeping roll/pitch rates near zero.
+- `low_forward_speed_penalty`: Penalizes commanded forward episodes that remain near-stationary after a short grace period.
 - `orientation_tracking`: Tracks upright orientation.
 - `base_height_tracking`: Tracks the target base height.
 - `periodic_force`: Rewards contact force on the foot currently expected to be in stance.
@@ -249,6 +249,7 @@ The DWL default direction is to keep `base_lin_vel` and `height_scan` out of the
 - `feet_movement`: Penalizes vertical foot velocity and acceleration (`z` axis only) using Isaac Lab 3.0's `body_lin_acc_w` acceleration field.
   The DWL cfg keeps the paper weight at `-0.01` but scales vertical acceleration by `10.0` before squaring so SI-unit accelerations do not dominate early learning.
 - `large_contact`: Penalizes excessive foot contact force.
+- `body_contact`: Penalizes torso contact before it becomes a stable failure mode.
 
 The gait helpers matter here because five rewards are phase-aware: `periodic_force`, `periodic_velocity`, `foot_height_tracking`, `foot_velocity_tracking`, and `foot_sagittal_tracking`. They must use the same clock, stance mask, and foot trajectory reference as the observations; otherwise the policy could observe one gait phase while rewards score another.
 
@@ -321,3 +322,13 @@ listing every small constant change.
   iterations with gated yaw-drift suppression, linear velocity tolerance was
   softened to `2.5`, swing air-time was lengthened, and the G1 default arm pose
   was relaxed.
+
+- Post-spike locomotion stabilization: A later run showed a sharp `base_contact`
+  spike near the first yaw-curriculum step followed by a near-stationary gait.
+  Yaw commands are temporarily disabled in both train and play cfgs while
+  forward walking is recovered, terrain initialization remains curriculum-driven,
+  swing air-time reward was reduced and gated by real forward speed/uprightness,
+  low forward speed now receives a command-gated penalty after a short grace
+  period, and torso contact receives an explicit penalty before it becomes a
+  repeatable failure mode. Dead reward plumbing for `double_support` and the
+  unused yaw-frame velocity wrapper was removed.

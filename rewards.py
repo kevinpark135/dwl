@@ -16,10 +16,6 @@ import torch
 
 from isaaclab.managers import SceneEntityCfg
 
-from isaaclab_tasks.manager_based.locomotion.velocity.mdp.rewards import (
-    track_lin_vel_xy_yaw_frame_exp as isaac_track_lin_vel_xy_yaw_frame_exp,
-)
-
 try:
     from .gait import DwlGaitCfg, foot_height_reference, foot_velocity_reference, stance_mask
     from .observations import DEFAULT_CONTACT_SENSOR_CFG, DEFAULT_CONTROLLED_JOINT_CFG, DEFAULT_FOOT_BODY_CFG
@@ -178,17 +174,6 @@ def base_motion_penalty(env: "ManagerBasedRLEnv", asset_cfg: SceneEntityCfg = Sc
     return torch.square(lin_vel[:, 2]) + torch.sum(torch.square(ang_vel[:, :2]), dim=-1)
 
 
-def double_support(
-    env: "ManagerBasedRLEnv",
-    sensor_cfg: SceneEntityCfg = DEFAULT_CONTACT_SENSOR_CFG,
-    contact_threshold: float = 1.0,
-) -> torch.Tensor:
-    """Reward both feet being in contact for stand-first training."""
-
-    foot_contact = _foot_force_norm(env, sensor_cfg) > contact_threshold
-    return torch.all(foot_contact, dim=-1).to(dtype=torch.float32)
-
-
 def lin_velocity_tracking(
     env: "ManagerBasedRLEnv",
     command_name: str = "base_velocity",
@@ -199,17 +184,6 @@ def lin_velocity_tracking(
 
     asset = env.scene[asset_cfg.name]
     return tracking_exp(asset.data.root_lin_vel_b.torch[:, :3] - _command_xyz(env, command_name), tolerance)
-
-
-def lin_velocity_tracking_yaw_frame(
-    env: "ManagerBasedRLEnv",
-    command_name: str = "base_velocity",
-    std: float = 0.5,
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-) -> torch.Tensor:
-    """Compatibility wrapper for Isaac Lab's yaw-frame XY velocity tracking."""
-
-    return isaac_track_lin_vel_xy_yaw_frame_exp(env, std=std, command_name=command_name, asset_cfg=asset_cfg)
 
 
 def forward_progress(
@@ -226,6 +200,25 @@ def forward_progress(
     forward_vel = asset.data.root_lin_vel_b.torch[:, 0]
     capped_forward_vel = torch.minimum(torch.clamp(forward_vel, min=0.0), command_x)
     return gate * capped_forward_vel / torch.clamp(command_x, min=min_command_x)
+
+
+def low_forward_speed_penalty(
+    env: "ManagerBasedRLEnv",
+    command_name: str = "base_velocity",
+    min_command_x: float = 0.2,
+    min_forward_speed: float = 0.2,
+    grace_period_s: float = 0.5,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Penalize commanded forward episodes that settle into near-still behavior."""
+
+    asset = env.scene[asset_cfg.name]
+    command_x = env.command_manager.get_command(command_name)[:, 0].clamp_min(0.0)
+    command_gate = command_x > min_command_x
+    time_gate = _episode_time_s(env) > grace_period_s
+    forward_speed = asset.data.root_lin_vel_b.torch[:, 0]
+    shortfall = torch.clamp(min_forward_speed - forward_speed, min=0.0) / max(min_forward_speed, 1.0e-6)
+    return (command_gate & time_gate).to(dtype=forward_speed.dtype) * torch.square(shortfall)
 
 
 def ang_velocity_tracking(
@@ -317,6 +310,8 @@ def commanded_swing_air_time(
     asset_cfg: SceneEntityCfg = DEFAULT_FOOT_BODY_CFG,
     sensor_cfg: SceneEntityCfg = DEFAULT_CONTACT_SENSOR_CFG,
     min_command_x: float = 0.2,
+    min_forward_speed: float = 0.0,
+    max_tilt: float | None = None,
     contact_threshold: float = 1.0,
     clearance_height: float = 0.06,
     target_air_time: float = 0.25,
@@ -333,6 +328,12 @@ def commanded_swing_air_time(
     num_envs = _num_envs(env)
     command_x = env.command_manager.get_command(command_name)[:, 0].clamp_min(0.0)
     gate = (command_x > min_command_x).to(device=device, dtype=torch.float32)
+    asset = env.scene[asset_cfg.name]
+    forward_speed = asset.data.root_lin_vel_b.torch[:, 0]
+    gate = gate * (forward_speed > min_forward_speed).to(device=device, dtype=torch.float32)
+    if max_tilt is not None:
+        tilt = torch.linalg.norm(asset.data.projected_gravity_b.torch[:, :2], dim=-1)
+        gate = gate * (tilt < max_tilt).to(device=device, dtype=torch.float32)
 
     foot_pos_w, _ = _foot_pos_vel(env, asset_cfg)
     baseline = getattr(env, baseline_attr, None)
@@ -593,3 +594,14 @@ def large_contact(
 
     force = _foot_force_norm(env, sensor_cfg)
     return torch.sum(torch.clamp(force - threshold, min=0.0, max=clip_max), dim=-1)
+
+
+def body_contact(
+    env: "ManagerBasedRLEnv",
+    sensor_cfg: SceneEntityCfg,
+    threshold: float = 1.0,
+) -> torch.Tensor:
+    """Penalize non-foot body contact before it becomes a stable failure mode."""
+
+    force = _foot_force_norm(env, sensor_cfg)
+    return torch.sum((force > threshold).to(dtype=torch.float32), dim=-1)
