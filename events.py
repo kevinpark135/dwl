@@ -18,9 +18,9 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils.math import sample_uniform
 
 try:
-    from .observations import DEFAULT_CONTROLLED_JOINT_CFG
+    from .observations import DEFAULT_CONTROLLED_JOINT_CFG, DEFAULT_FOOT_BODY_CFG
 except ImportError:
-    from observations import DEFAULT_CONTROLLED_JOINT_CFG
+    from observations import DEFAULT_CONTROLLED_JOINT_CFG, DEFAULT_FOOT_BODY_CFG
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
@@ -33,6 +33,7 @@ DWL_MOTOR_STRENGTH_ATTR = "dwl_motor_strength"
 DWL_PD_FACTORS_ATTR = "dwl_pd_factors"
 DWL_SYSTEM_DELAY_ATTR = "dwl_system_delay_s"
 DWL_OBSERVATION_NOISE_RANGES_ATTR = "dwl_observation_noise_ranges"
+DWL_FOOT_HEIGHT_BASELINE_ATTR = "dwl_foot_height_baseline"
 
 
 def _num_envs(env: "ManagerBasedEnv") -> int:
@@ -234,6 +235,28 @@ def randomize_joint_reset_noise(
     asset.write_joint_velocity_to_sim_index(
         velocity=joint_vel, joint_ids=_int32_index(joint_ids), env_ids=ids.to(dtype=torch.int32)
     )
+
+
+def store_foot_height_baseline(
+    env: "ManagerBasedEnv",
+    env_ids: torch.Tensor | None,
+    asset_cfg: SceneEntityCfg = DEFAULT_FOOT_BODY_CFG,
+    baseline_attr: str = DWL_FOOT_HEIGHT_BASELINE_ATTR,
+) -> torch.Tensor:
+    """Store per-env foot-height baselines for terrain-relative foot rewards."""
+
+    asset = env.scene[asset_cfg.name]
+    ids = _resolve_env_ids(env, env_ids, asset.device)
+    body_ids = _resolve_body_ids(asset, asset_cfg, asset.device)
+    foot_z = asset.data.body_link_pose_w.torch[ids[:, None], body_ids, 2].clone()
+
+    buffer = getattr(env, baseline_attr, None)
+    expected_shape = (_num_envs(env), body_ids.numel())
+    if buffer is None or buffer.shape != expected_shape:
+        buffer = torch.zeros(expected_shape, device=_device(env), dtype=foot_z.dtype)
+        setattr(env, baseline_attr, buffer)
+    getattr(env, baseline_attr)[ids.to(_device(env))] = foot_z.to(_device(env))
+    return foot_z
 
 
 def randomize_joint_position_observation_noise(

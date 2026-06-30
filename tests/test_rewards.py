@@ -60,6 +60,7 @@ def _mock_env(num_envs=1):
             action=torch.tensor([[1.0, 2.0, 3.0]]).repeat(num_envs, 1),
             prev_action=torch.tensor([[0.5, 1.5, 2.5]]).repeat(num_envs, 1),
         ),
+        dwl_foot_height_baseline=torch.zeros(num_envs, 2),
     )
     env.scene["robot"] = SimpleNamespace(
         data=SimpleNamespace(

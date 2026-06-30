@@ -11,6 +11,7 @@ event, and gait modules.
 """
 
 from isaaclab.managers import EventTermCfg as EventTerm
+from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
@@ -27,12 +28,14 @@ from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import (
 
 try:
     from . import actions as dwl_actions
+    from . import curriculums as dwl_curriculums
     from . import events as dwl_events
     from . import observations as dwl_obs
     from . import rewards as dwl_rewards
     from .gait import DwlGaitCfg
 except ImportError:
     import actions as dwl_actions
+    import curriculums as dwl_curriculums
     import events as dwl_events
     import observations as dwl_obs
     import rewards as dwl_rewards
@@ -348,6 +351,7 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         # Start on easier terrain and let distance-based curriculum promote the
         # policy after it actually learns to translate.
         self.scene.terrain.max_init_terrain_level = 1
+        self.curriculum.terrain_levels = CurrTerm(func=dwl_curriculums.dwl_terrain_levels)
         self.actions.joint_pos = dwl_actions.DwlJointPositionActionCfg(
             asset_name="robot",
             joint_names=dwl_obs.CONTROLLED_LEG_JOINT_NAMES,
@@ -431,6 +435,11 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
                 "position_range": (-0.05, 0.05),
                 "velocity_range": (-0.1, 0.1),
             },
+        )
+        self.events.foot_height_baseline = EventTerm(
+            func=dwl_events.store_foot_height_baseline,
+            mode="reset",
+            params={"asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG},
         )
         self.events.push_force_torques = EventTerm(
             func=dwl_events.sample_push_force_torques,

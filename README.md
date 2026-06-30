@@ -273,6 +273,8 @@ Event helpers:
 - `randomize_motor_offset`: Samples/stores `env.dwl_motor_offset` for action target processing.
 - `randomize_motor_strength`: Scales actuator effort limits and records `env.dwl_motor_strength`.
 - `randomize_pd_factors`: Scales actuator stiffness/damping and records `env.dwl_pd_factors`.
+- `store_foot_height_baseline`: Stores reset-time foot heights so foot trajectory
+  rewards use terrain-relative swing clearance instead of raw world height.
 
 The event helpers use Isaac Lab 3.0-compatible signatures with `env_ids` as the
 second argument. PhysX/Warp index tensors passed back into simulation APIs are
@@ -338,3 +340,11 @@ listing every small constant change.
   tracking kernel was sharpened, capped forward-progress reward was increased,
   and the low-speed penalty now scales against a command-relative speed floor
   instead of only penalizing speeds below a fixed near-zero threshold.
+
+- Long-run stabilization prep: After reward-scale alignment produced visible
+  walking, rough-terrain learning was made less jumpy before longer runs. Foot
+  height rewards now refresh a reset-time baseline so rough terrain does not
+  leak raw world height into swing-clearance terms, and DWL uses a conservative
+  terrain curriculum that requires sustained progress before promotion, demotes
+  only clear short base-contact failures, and caps early terrain levels by
+  global training step.

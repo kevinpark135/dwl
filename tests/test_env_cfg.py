@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from actions import DwlJointPositionActionCfg
+from curriculums import dwl_terrain_levels
 from baseline_env_cfg import G1ProprioceptiveBaselineEnvCfg, G1ProprioceptiveBaselineEnvCfg_PLAY
 from dwl_env_cfg import G1DwlEnvCfg, G1DwlEnvCfg_PLAY, YAW_CURRICULUM_STEPS
 from observations import CONTROLLED_LEG_JOINT_NAMES
@@ -93,6 +94,7 @@ def test_dwl_env_cfg_wires_dwl_events():
     assert cfg.events.reset_base.params["pose_range"]["yaw"] == (-0.1, 0.1)
     assert cfg.events.reset_base.params["velocity_range"]["roll"] == (-0.05, 0.05)
     assert cfg.scene.terrain.max_init_terrain_level == 1
+    assert cfg.curriculum.terrain_levels.func == dwl_terrain_levels
     assert cfg.scene.height_scanner.pattern_cfg.resolution == 0.1
     assert cfg.scene.height_scanner.pattern_cfg.size == [1.1, 0.7]
     assert cfg.rewards.feet_movement.params["acceleration_scale"] == 10.0
@@ -103,6 +105,7 @@ def test_dwl_env_cfg_wires_dwl_events():
     assert cfg.events.joint_position_observation_noise.params["noise_range"] == (-0.3, 0.3)
     assert cfg.events.push_force_torques is not None
     assert cfg.events.push_force_torques.params["force_range"] == (0.0, 0.0)
+    assert cfg.events.foot_height_baseline is not None
 
 
 def test_play_cfg_disables_policy_noise_and_push_wrenches():

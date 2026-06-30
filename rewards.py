@@ -127,6 +127,23 @@ def _foot_pos_vel(env: "ManagerBasedRLEnv", asset_cfg: SceneEntityCfg) -> tuple[
     return foot_pos_w, foot_vel_w
 
 
+def _foot_height_baseline(
+    env: "ManagerBasedRLEnv",
+    foot_pos_w: torch.Tensor,
+    baseline_attr: str,
+) -> torch.Tensor:
+    baseline = getattr(env, baseline_attr, None)
+    expected_shape = foot_pos_w[..., 2].shape
+    if baseline is None or baseline.shape != expected_shape:
+        baseline = foot_pos_w[..., 2].detach().clone()
+        setattr(env, baseline_attr, baseline)
+
+    reset_ids = torch.nonzero(env.episode_length_buf.to(device=foot_pos_w.device) == 0, as_tuple=False).flatten()
+    if reset_ids.numel() > 0:
+        baseline[reset_ids] = foot_pos_w[reset_ids, :, 2].detach()
+    return baseline.to(device=foot_pos_w.device, dtype=foot_pos_w.dtype)
+
+
 def _yaw_rotate_inverse(asset, vector_w: torch.Tensor) -> torch.Tensor:
     """Rotate world-frame vectors into the base yaw frame when root orientation is available."""
 
@@ -357,9 +374,7 @@ def commanded_swing_air_time(
         gate = gate * (tilt < max_tilt).to(device=device, dtype=torch.float32)
 
     foot_pos_w, _ = _foot_pos_vel(env, asset_cfg)
-    baseline = getattr(env, baseline_attr, None)
-    if baseline is None:
-        baseline = torch.zeros((num_envs, foot_pos_w.shape[1]), device=foot_pos_w.device, dtype=foot_pos_w.dtype)
+    baseline = _foot_height_baseline(env, foot_pos_w, baseline_attr)
     foot_height = foot_pos_w[..., 2] - baseline
 
     expected_swing = 1.0 - stance_mask(_episode_time_s(env), gait_cfg.cycle_time_s, gait_cfg.phase_offset)
@@ -406,9 +421,7 @@ def foot_height_tracking(
     """Track the quintic swing-foot height reference."""
 
     foot_pos_w, _ = _foot_pos_vel(env, asset_cfg)
-    baseline = getattr(env, baseline_attr, None)
-    if baseline is None:
-        baseline = torch.zeros((_num_envs(env), foot_pos_w.shape[1]), device=foot_pos_w.device, dtype=foot_pos_w.dtype)
+    baseline = _foot_height_baseline(env, foot_pos_w, baseline_attr)
     actual_height = foot_pos_w[..., 2] - baseline
     target_height = foot_height_reference(_episode_time_s(env), gait_cfg)
     mask = 1.0 - stance_mask(_episode_time_s(env), gait_cfg.cycle_time_s, gait_cfg.phase_offset)
@@ -504,9 +517,7 @@ def foot_sagittal_tracking(
     target_rel_x = swing * target_forward + stance * target_backward
     error = foot_rel_vel_b[..., 0] - target_rel_x
 
-    baseline = getattr(env, baseline_attr, None)
-    if baseline is None:
-        baseline = torch.zeros((_num_envs(env), foot_pos_w.shape[1]), device=foot_pos_w.device, dtype=foot_pos_w.dtype)
+    baseline = _foot_height_baseline(env, foot_pos_w, baseline_attr)
     foot_height = foot_pos_w[..., 2] - baseline
     clearance = torch.clamp(foot_height / clearance_height, min=0.0, max=1.0)
     contact = (_foot_force_norm(env, sensor_cfg) > contact_threshold).to(dtype=foot_vel_b.dtype)

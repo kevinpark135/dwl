@@ -9,6 +9,7 @@ from isaaclab.managers import SceneEntityCfg
 
 from events import (
     DWL_FRICTION_ATTR,
+    DWL_FOOT_HEIGHT_BASELINE_ATTR,
     DWL_MOTOR_OFFSET_ATTR,
     DWL_MOTOR_STRENGTH_ATTR,
     DWL_OBSERVATION_NOISE_RANGES_ATTR,
@@ -23,6 +24,7 @@ from events import (
     randomize_pd_factors,
     randomize_system_delay,
     randomize_joint_reset_noise,
+    store_foot_height_baseline,
     randomize_joint_position_observation_noise,
     sample_push_force_torques,
     store_friction,
@@ -63,6 +65,12 @@ class MockAsset:
         }
         self.data = SimpleNamespace(
             body_mass=SimpleNamespace(torch=torch.full((2, 2), 10.0)),
+            body_link_pose_w=SimpleNamespace(torch=torch.tensor(
+                [
+                    [[0.0, 0.0, 0.2], [0.0, 0.0, 0.3]],
+                    [[0.0, 0.0, 0.4], [0.0, 0.0, 0.5]],
+                ]
+            )),
             default_joint_pos=SimpleNamespace(torch=torch.zeros(2, 2)),
             default_joint_vel=SimpleNamespace(torch=torch.zeros(2, 2)),
             soft_joint_pos_limits=SimpleNamespace(torch=torch.stack((-torch.ones(2, 2), torch.ones(2, 2)), dim=-1)),
@@ -147,6 +155,16 @@ def test_randomize_joint_reset_noise_writes_clamped_joint_state():
 
     assert torch.allclose(env.scene["robot"].written_joint_pos, torch.full((2, 2), 0.5))
     assert torch.allclose(env.scene["robot"].written_joint_vel, torch.full((2, 2), 0.25))
+
+
+def test_store_foot_height_baseline_records_current_foot_z():
+    env = _mock_env()
+    asset_cfg = SceneEntityCfg("robot", body_ids=[0, 1])
+
+    baseline = store_foot_height_baseline(env, torch.tensor([1]), asset_cfg=asset_cfg)
+
+    assert torch.allclose(baseline, torch.tensor([[0.4, 0.5]]))
+    assert torch.allclose(getattr(env, DWL_FOOT_HEIGHT_BASELINE_ATTR)[1], torch.tensor([0.4, 0.5]))
 
 
 def test_observation_noise_events_record_ranges():
