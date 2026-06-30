@@ -332,3 +332,9 @@ listing every small constant change.
   period, and torso contact receives an explicit penalty before it becomes a
   repeatable failure mode. Dead reward plumbing for `double_support` and the
   unused yaw-frame velocity wrapper was removed.
+
+- Standing local-optimum removal: Checkpoint play showed the stabilized policy
+  could still stand or creep in place on commanded forward tasks. The forward
+  tracking kernel was sharpened, capped forward-progress reward was increased,
+  and the low-speed penalty now scales against a command-relative speed floor
+  instead of only penalizing speeds below a fixed near-zero threshold.

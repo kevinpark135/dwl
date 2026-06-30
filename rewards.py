@@ -206,18 +206,23 @@ def low_forward_speed_penalty(
     env: "ManagerBasedRLEnv",
     command_name: str = "base_velocity",
     min_command_x: float = 0.2,
-    min_forward_speed: float = 0.2,
+    min_forward_speed: float = 0.25,
+    command_speed_fraction: float = 0.6,
     grace_period_s: float = 0.5,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
-    """Penalize commanded forward episodes that settle into near-still behavior."""
+    """Penalize commanded forward episodes that settle into slow or still behavior."""
 
     asset = env.scene[asset_cfg.name]
     command_x = env.command_manager.get_command(command_name)[:, 0].clamp_min(0.0)
     command_gate = command_x > min_command_x
     time_gate = _episode_time_s(env) > grace_period_s
     forward_speed = asset.data.root_lin_vel_b.torch[:, 0]
-    shortfall = torch.clamp(min_forward_speed - forward_speed, min=0.0) / max(min_forward_speed, 1.0e-6)
+    speed_floor = torch.maximum(
+        torch.full_like(command_x, min_forward_speed),
+        command_x * command_speed_fraction,
+    )
+    shortfall = torch.clamp(speed_floor - forward_speed, min=0.0) / torch.clamp(speed_floor, min=1.0e-6)
     return (command_gate & time_gate).to(dtype=forward_speed.dtype) * torch.square(shortfall)
 
 

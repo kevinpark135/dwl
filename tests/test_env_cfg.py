@@ -40,17 +40,18 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
     assert cfg.scene.robot.actuators["feet"].damping == 8.0
     assert cfg.rewards.alive.weight == 0.05
     assert cfg.rewards.base_motion_penalty.weight == -0.01
-    assert cfg.rewards.lin_velocity_tracking.weight == 4.0
-    assert cfg.rewards.lin_velocity_tracking.params["tolerance"] == 2.5
+    assert cfg.rewards.lin_velocity_tracking.weight == 5.0
+    assert cfg.rewards.lin_velocity_tracking.params["tolerance"] == 5.0
     assert cfg.observations.policy.velocity_commands.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
     assert cfg.observations.privileged.velocity_commands.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
     assert cfg.rewards.ang_velocity_tracking.weight == 1.0
     assert cfg.rewards.ang_velocity_tracking.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
     assert cfg.rewards.yaw_drift_penalty.weight == -0.15
     assert cfg.rewards.yaw_drift_penalty.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
-    assert cfg.rewards.forward_progress.weight == 1.0
-    assert cfg.rewards.low_forward_speed_penalty.weight == -0.5
-    assert cfg.rewards.low_forward_speed_penalty.params["min_forward_speed"] == 0.2
+    assert cfg.rewards.forward_progress.weight == 2.5
+    assert cfg.rewards.low_forward_speed_penalty.weight == -2.0
+    assert cfg.rewards.low_forward_speed_penalty.params["min_forward_speed"] == 0.25
+    assert cfg.rewards.low_forward_speed_penalty.params["command_speed_fraction"] == 0.6
     assert cfg.rewards.low_forward_speed_penalty.params["grace_period_s"] == 0.5
     assert cfg.rewards.periodic_force.weight == 0.6
     assert cfg.rewards.periodic_velocity.weight == 1.0

@@ -149,8 +149,8 @@ class G1Rewards(RewardsCfg):
     )
     lin_velocity_tracking = RewTerm(
         func=dwl_rewards.lin_velocity_tracking,
-        weight=4.0,
-        params={"command_name": "base_velocity", "tolerance": 2.5},
+        weight=5.0,
+        params={"command_name": "base_velocity", "tolerance": 5.0},
     )
     ang_velocity_tracking = RewTerm(
         func=dwl_rewards.ang_velocity_tracking,
@@ -169,16 +169,17 @@ class G1Rewards(RewardsCfg):
     )
     forward_progress = RewTerm(
         func=dwl_rewards.forward_progress,
-        weight=1.0,
+        weight=2.5,
         params={"command_name": "base_velocity", "min_command_x": 0.2},
     )
     low_forward_speed_penalty = RewTerm(
         func=dwl_rewards.low_forward_speed_penalty,
-        weight=-0.5,
+        weight=-2.0,
         params={
             "command_name": "base_velocity",
             "min_command_x": 0.2,
-            "min_forward_speed": 0.2,
+            "min_forward_speed": 0.25,
+            "command_speed_fraction": 0.6,
             "grace_period_s": 0.5,
             "asset_cfg": dwl_obs.DEFAULT_ROBOT_CFG,
         },

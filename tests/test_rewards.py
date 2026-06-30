@@ -119,14 +119,24 @@ def test_low_forward_speed_penalty_is_commanded_and_after_grace_period():
     env.episode_length_buf[:] = 3
     env.scene["robot"].data.root_lin_vel_b.torch[:, 0] = 0.1
 
-    assert torch.allclose(low_forward_speed_penalty(env, min_forward_speed=0.2), torch.tensor([0.25]))
+    assert torch.allclose(
+        low_forward_speed_penalty(env, min_forward_speed=0.25, command_speed_fraction=0.6),
+        torch.tensor([0.4444]),
+        atol=1.0e-4,
+    )
 
     env.episode_length_buf[:] = 1
-    assert torch.allclose(low_forward_speed_penalty(env, min_forward_speed=0.2), torch.zeros(1))
+    assert torch.allclose(
+        low_forward_speed_penalty(env, min_forward_speed=0.25, command_speed_fraction=0.6),
+        torch.zeros(1),
+    )
 
     env.episode_length_buf[:] = 3
     env.command_manager.command = torch.tensor([[0.1, 0.0, 0.0]])
-    assert torch.allclose(low_forward_speed_penalty(env, min_forward_speed=0.2), torch.zeros(1))
+    assert torch.allclose(
+        low_forward_speed_penalty(env, min_forward_speed=0.25, command_speed_fraction=0.6),
+        torch.zeros(1),
+    )
 
 
 def test_stability_rewards_ignore_commanded_horizontal_motion():
