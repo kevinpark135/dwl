@@ -149,9 +149,25 @@ def _yaw_rotate_inverse(asset, vector_w: torch.Tensor) -> torch.Tensor:
 def _action_history(env: "ManagerBasedRLEnv") -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     action = env.action_manager.action
     prev_action = env.action_manager.prev_action
-    prev_prev_action = getattr(env, "dwl_prev_prev_action", None)
-    if prev_prev_action is None:
-        prev_prev_action = torch.zeros_like(action)
+    state = getattr(env, "dwl_action_smoothness_state", None)
+    common_step = int(getattr(env, "common_step_counter", -1))
+    if (
+        state is None
+        or state["prev_action_snapshot"].shape != prev_action.shape
+        or state["prev_action_snapshot"].device != prev_action.device
+    ):
+        state = {
+            "prev_action_snapshot": prev_action.clone(),
+            "current_prev_prev_action": prev_action.clone(),
+            "last_step": common_step,
+        }
+        setattr(env, "dwl_action_smoothness_state", state)
+    elif state["last_step"] != common_step:
+        state["current_prev_prev_action"] = state["prev_action_snapshot"].clone()
+        state["prev_action_snapshot"] = prev_action.clone()
+        state["last_step"] = common_step
+
+    prev_prev_action = state["current_prev_prev_action"]
     return action, prev_action, prev_prev_action
 
 

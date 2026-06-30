@@ -251,6 +251,7 @@ class DwlActorModel(nn.Module):
         decoder_obs_set: str = "critic",
         decoder_hidden_dims: tuple[int, ...] | list[int] = (256, 128),
         decoder_activation: str | None = None,
+        decoder_target_normalization: bool = True,
         stochastic: Any = None,
         init_noise_std: Any = None,
         noise_std_type: Any = None,
@@ -294,6 +295,12 @@ class DwlActorModel(nn.Module):
         self.decoder = (
             _make_mlp(int(latent_dim), self.decoder_output_dim, decoder_hidden_dims, decoder_activation)
             if self.decoder_output_dim > 0
+            else nn.Identity()
+        )
+        self.decoder_target_normalization = bool(decoder_target_normalization)
+        self.decoder_target_normalizer = (
+            RunningNormalizer(self.decoder_output_dim)
+            if self.decoder_target_normalization and self.decoder_output_dim > 0
             else nn.Identity()
         )
 
@@ -357,6 +364,16 @@ class DwlActorModel(nn.Module):
         if not self.decoder_obs_groups:
             raise RuntimeError("No decoder observation groups are configured.")
         return _concat_obs(obs, self.decoder_obs_groups)
+
+    def normalized_reconstruction_target(self, obs: TensorDict, update: bool = False) -> torch.Tensor:
+        """Return the decoder target in the scale used by the reconstruction loss."""
+
+        target = self.reconstruction_target(obs)
+        if self.decoder_target_normalization and isinstance(self.decoder_target_normalizer, RunningNormalizer):
+            if update:
+                self.decoder_target_normalizer.update(target)
+            return self.decoder_target_normalizer(target)
+        return target
 
     def reset(self, dones: torch.Tensor | None = None, hidden_state: HiddenState = None) -> None:
         del dones, hidden_state

@@ -64,6 +64,29 @@ def test_dwl_actor_decodes_privileged_reconstruction_target():
     assert reconstruction.shape == target.shape == (4, 7)
 
 
+def test_dwl_actor_normalizes_reconstruction_target_for_decoder_loss():
+    obs = _obs()
+    obs["privileged"] = obs["privileged"] * 100.0 + 50.0
+    obs_groups = {"actor": ["policy"], "critic": ["privileged"]}
+    actor = DwlActorModel(
+        obs,
+        obs_groups,
+        "actor",
+        output_dim=3,
+        history_length=3,
+        encoder_hidden_dim=16,
+        latent_dim=8,
+        hidden_dims=[16],
+        decoder_hidden_dims=[16],
+        distribution_cfg={"class_name": "GaussianDistribution", "init_std": 1.0},
+    )
+
+    target = actor.normalized_reconstruction_target(obs, update=True)
+
+    assert target.shape == (4, 7)
+    assert torch.all(torch.abs(target.mean(dim=0)) < 1.0e-4)
+
+
 def test_dwl_critic_returns_scalar_values_from_privileged_state():
     obs = _obs()
     obs_groups = {"critic": ["privileged"]}

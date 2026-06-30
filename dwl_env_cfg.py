@@ -149,7 +149,7 @@ class G1Rewards(RewardsCfg):
     )
     lin_velocity_tracking = RewTerm(
         func=dwl_rewards.lin_velocity_tracking,
-        weight=5.0,
+        weight=1.0,
         params={"command_name": "base_velocity", "tolerance": 5.0},
     )
     ang_velocity_tracking = RewTerm(
@@ -169,12 +169,12 @@ class G1Rewards(RewardsCfg):
     )
     forward_progress = RewTerm(
         func=dwl_rewards.forward_progress,
-        weight=2.5,
+        weight=0.5,
         params={"command_name": "base_velocity", "min_command_x": 0.2},
     )
     low_forward_speed_penalty = RewTerm(
         func=dwl_rewards.low_forward_speed_penalty,
-        weight=-2.0,
+        weight=-0.5,
         params={
             "command_name": "base_velocity",
             "min_command_x": 0.2,
@@ -187,12 +187,12 @@ class G1Rewards(RewardsCfg):
     orientation_tracking = RewTerm(func=dwl_rewards.orientation_tracking, weight=1.0, params={"tolerance": 5.0})
     base_height_tracking = RewTerm(
         func=dwl_rewards.base_height_tracking,
-        weight=1.0,
+        weight=0.5,
         params={"target_height": 0.7, "tolerance": 10.0},
     )
     periodic_force = RewTerm(
         func=dwl_rewards.periodic_force,
-        weight=0.6,
+        weight=1.0,
         params={"gait_cfg": DwlGaitCfg(), "sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG},
     )
     periodic_velocity = RewTerm(
@@ -218,12 +218,12 @@ class G1Rewards(RewardsCfg):
     )
     foot_height_tracking = RewTerm(
         func=dwl_rewards.foot_height_tracking,
-        weight=0.3,
+        weight=1.0,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "tolerance": 5.0},
     )
     foot_velocity_tracking = RewTerm(
         func=dwl_rewards.foot_velocity_tracking,
-        weight=0.2,
+        weight=0.5,
         params={"gait_cfg": DwlGaitCfg(), "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "tolerance": 3.0},
     )
     foot_lateral_tracking = RewTerm(
@@ -272,18 +272,18 @@ class G1Rewards(RewardsCfg):
     )
     default_joint_tracking = RewTerm(
         func=dwl_rewards.default_joint_tracking,
-        weight=0.02,
+        weight=0.2,
         params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG, "tolerance": 2.0},
     )
     energy_cost = RewTerm(
         func=dwl_rewards.energy_cost,
-        weight=-0.00003,
+        weight=-0.0001,
         params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG},
     )
-    action_smoothness = RewTerm(func=dwl_rewards.action_smoothness, weight=-0.0002)
+    action_smoothness = RewTerm(func=dwl_rewards.action_smoothness, weight=-0.01)
     feet_movement = RewTerm(
         func=dwl_rewards.feet_movement,
-        weight=-0.0005,
+        weight=-0.01,
         params={"asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "acceleration_scale": 10.0},
     )
     large_contact = RewTerm(

@@ -277,7 +277,7 @@ def test_regularization_terms_return_expected_costs():
 
     assert torch.allclose(default_joint_tracking(env, asset_cfg=asset_cfg), torch.ones(1))
     assert torch.allclose(energy_cost(env, asset_cfg=asset_cfg), torch.tensor([4.0]))
-    assert torch.allclose(action_smoothness(env), torch.tensor([5.0]))
+    assert torch.allclose(action_smoothness(env), torch.tensor([0.75]))
 
     env.scene["robot"].data.joint_pos.torch[:] = torch.tensor([[0.5, -0.25]])
     env.scene["robot"].data.joint_vel.torch[:] = torch.tensor([[2.0, 1.0]])

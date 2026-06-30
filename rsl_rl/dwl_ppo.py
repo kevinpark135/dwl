@@ -220,7 +220,10 @@ class DwlPPO(PPO):
             return zero, zero
 
         reconstruction = self.actor.reconstruct(observations)
-        target = self.actor.reconstruction_target(observations).detach()
+        if hasattr(self.actor, "normalized_reconstruction_target"):
+            target = self.actor.normalized_reconstruction_target(observations, update=True).detach()
+        else:
+            target = self.actor.reconstruction_target(observations).detach()
         reconstruction_loss = torch.nn.functional.mse_loss(reconstruction, target)
 
         latent = getattr(self.actor, "latent", None)

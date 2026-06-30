@@ -40,7 +40,7 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
     assert cfg.scene.robot.actuators["feet"].damping == 8.0
     assert cfg.rewards.alive.weight == 0.05
     assert cfg.rewards.base_motion_penalty.weight == -0.01
-    assert cfg.rewards.lin_velocity_tracking.weight == 5.0
+    assert cfg.rewards.lin_velocity_tracking.weight == 1.0
     assert cfg.rewards.lin_velocity_tracking.params["tolerance"] == 5.0
     assert cfg.observations.policy.velocity_commands.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
     assert cfg.observations.privileged.velocity_commands.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
@@ -48,20 +48,20 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
     assert cfg.rewards.ang_velocity_tracking.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
     assert cfg.rewards.yaw_drift_penalty.weight == -0.15
     assert cfg.rewards.yaw_drift_penalty.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
-    assert cfg.rewards.forward_progress.weight == 2.5
-    assert cfg.rewards.low_forward_speed_penalty.weight == -2.0
+    assert cfg.rewards.forward_progress.weight == 0.5
+    assert cfg.rewards.low_forward_speed_penalty.weight == -0.5
     assert cfg.rewards.low_forward_speed_penalty.params["min_forward_speed"] == 0.25
     assert cfg.rewards.low_forward_speed_penalty.params["command_speed_fraction"] == 0.6
     assert cfg.rewards.low_forward_speed_penalty.params["grace_period_s"] == 0.5
-    assert cfg.rewards.periodic_force.weight == 0.6
+    assert cfg.rewards.periodic_force.weight == 1.0
     assert cfg.rewards.periodic_velocity.weight == 1.0
     assert cfg.rewards.commanded_swing_air_time.weight == 0.4
     assert cfg.rewards.commanded_swing_air_time.params["min_forward_speed"] == 0.15
     assert cfg.rewards.commanded_swing_air_time.params["max_tilt"] == 0.55
     assert cfg.rewards.commanded_swing_air_time.params["target_air_time"] == 0.4
     assert cfg.rewards.commanded_swing_air_time.params["max_air_time"] == 0.8
-    assert cfg.rewards.foot_height_tracking.weight == 0.3
-    assert cfg.rewards.foot_velocity_tracking.weight == 0.2
+    assert cfg.rewards.foot_height_tracking.weight == 1.0
+    assert cfg.rewards.foot_velocity_tracking.weight == 0.5
     assert cfg.rewards.foot_lateral_tracking.weight == 0.8
     assert cfg.rewards.foot_lateral_tracking.params["target_width"] == 0.16
     assert cfg.rewards.foot_lateral_velocity.weight == -0.04
@@ -69,10 +69,10 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
     assert cfg.rewards.foot_sagittal_tracking.params["sensor_cfg"] is not None
     assert cfg.rewards.foot_sagittal_symmetry.weight == 0.4
     assert cfg.rewards.hip_deviation.weight == -0.03
-    assert cfg.rewards.default_joint_tracking.weight == 0.02
-    assert cfg.rewards.action_smoothness.weight == -0.0002
-    assert cfg.rewards.energy_cost.weight == -0.00003
-    assert cfg.rewards.feet_movement.weight == -0.0005
+    assert cfg.rewards.default_joint_tracking.weight == 0.2
+    assert cfg.rewards.action_smoothness.weight == -0.01
+    assert cfg.rewards.energy_cost.weight == -0.0001
+    assert cfg.rewards.feet_movement.weight == -0.01
     assert cfg.rewards.body_contact.weight == -5.0
     assert cfg.rewards.body_contact.params["sensor_cfg"].body_names == "torso_link"
     assert cfg.rewards.track_lin_vel_xy_exp is None
