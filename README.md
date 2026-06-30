@@ -282,10 +282,44 @@ curriculum can promote the policy after it learns stable forward translation.
 
 ## Update Log
 
-Major changes only. Commit hashes point to the local history when available.
+Major changes only. The notes keep the trial-and-error path visible without
+listing every small constant change.
 
-- `418896c Add gait shape rewards`: Added lateral foot-corridor, side-shuffle, and hip yaw/roll regularization after the first walking policy learned a wide A-frame gait.
-- `6f8308a removed local optimum issue`: Rebalanced locomotion rewards away from upright standing and toward forward velocity, including capped `forward_progress` and commanded swing air-time.
-- `24f3878 removed local optimum issue`: Warmed yaw command learning so early training focuses on straight walking before turning.
-- `6dbc9eb Align DWL model dimensions with paper`: Matched DWL observation/model dimensions and PPO coefficients to the paper tables.
-- Current working tree after `418896c`: Narrowed target foot width to `0.16m`, slowed the gait reference to a `1.2s` cycle, added contact/clearance-aware sagittal foot tracking plus left/right sagittal symmetry, staged yaw targets at 500/750/1000/1500 iterations with gated yaw-drift suppression, softened linear-velocity tolerance to `2.5`, and relaxed the G1 default arm pose by lowering the elbow/shoulder defaults.
+- Initial DWL wiring: Registered DWL train/play tasks, split import-safe action
+  config from runtime action code, separated policy observations from privileged
+  critic/decoder state, and wired the custom DWL actor/critic/PPO path. This
+  established the task scaffold before gait tuning.
+- Isaac Lab 3.0 compatibility pass: Updated event signatures, reward APIs,
+  PhysX/Warp index dtypes, and vertical foot-acceleration handling so the task
+  could run cleanly on the local Isaac Lab 3.0 checkout.
+- Early stand-up debugging: Initial rollouts collapsed or contacted the torso
+  too quickly, so reset noise, friction/push randomization, actuator damping,
+  joint limits, and action initialization were softened in stages. A pure
+  stand-first setup was tried, then backed out because it encouraged staying
+  upright instead of walking.
+- Exploration and local-optimum removal (`fce87ae`, `0809d43`, `6f8308a`):
+  Zero/low forward commands and strong stability rewards created a passive
+  crouch or upright no-translation solution. The reward balance moved toward
+  forward velocity, capped forward progress, commanded swing air-time, and
+  weaker default/smoothness/energy penalties so the policy had a reason to
+  move both legs.
+- Paper dimension alignment (`6dbc9eb`): Matched the DWL model and PPO path to
+  the paper tables: encoder input, privileged decoder/critic state, height scan,
+  network widths, and PPO coefficients were brought into the expected shape.
+- Straight-walk curriculum (`24f3878`, `6f8308a`): Yaw learning was staged
+  because early turning made the biped exploit circular motion before learning
+  stable forward walking. Actor observations, privileged observations, and
+  `ang_velocity_tracking` use the same yaw target so policy and reward do not
+  disagree during the straight-walk phase.
+- First gait-shape pass (`418896c`): The first walking policy reached positive
+  terrain curriculum but looked wide and A-framed. Lateral foot-corridor,
+  side-shuffle, and hip yaw/roll regularization were added to narrow the stance
+  while keeping forward velocity dominant.
+- Human-like gait refinement (`8ae54cb`): Visual checks showed a wide stance,
+  high cadence, one-foot pivoting, circular drift, and stiff raised arms. The
+  gait clock was slowed to a `1.2s` cycle, target foot width was narrowed to
+  `0.16m`, contact/clearance-aware sagittal foot tracking and left/right
+  sagittal symmetry were added, yaw targets now open at 500/750/1000/1500
+  iterations with gated yaw-drift suppression, linear velocity tolerance was
+  softened to `2.5`, swing air-time was lengthened, and the G1 default arm pose
+  was relaxed.
