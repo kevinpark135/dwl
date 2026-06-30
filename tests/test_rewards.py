@@ -20,6 +20,8 @@ from rewards import (
     foot_height_tracking,
     foot_lateral_tracking,
     foot_lateral_velocity,
+    foot_sagittal_symmetry,
+    foot_sagittal_tracking,
     foot_velocity_tracking,
     forward_progress,
     hip_deviation,
@@ -29,6 +31,7 @@ from rewards import (
     periodic_velocity,
     feet_movement,
     tracking_exp,
+    yaw_drift_penalty,
 )
 
 
@@ -173,8 +176,8 @@ def test_foot_tracking_uses_gait_references_for_swing_foot():
 def test_foot_lateral_tracking_rewards_narrow_body_frame_corridor():
     env = _mock_env()
     asset_cfg = SceneEntityCfg("robot", body_ids=[0, 1])
-    env.scene["robot"].data.body_link_pose_w.torch[:, 0, :3] = torch.tensor([[0.0, 0.11, 0.0]])
-    env.scene["robot"].data.body_link_pose_w.torch[:, 1, :3] = torch.tensor([[0.0, -0.11, 0.0]])
+    env.scene["robot"].data.body_link_pose_w.torch[:, 0, :3] = torch.tensor([[0.0, 0.08, 0.0]])
+    env.scene["robot"].data.body_link_pose_w.torch[:, 1, :3] = torch.tensor([[0.0, -0.08, 0.0]])
 
     assert torch.allclose(foot_lateral_tracking(env, asset_cfg=asset_cfg), torch.ones(1), atol=1e-6)
 
@@ -188,6 +191,52 @@ def test_foot_lateral_velocity_penalizes_side_shuffle_only():
     env.scene["robot"].data.body_link_vel_w.torch[:, :, :3] = torch.tensor([[[2.0, 0.5, 1.0], [3.0, -0.25, 2.0]]])
 
     assert torch.allclose(foot_lateral_velocity(env, asset_cfg=asset_cfg), torch.tensor([0.3125]))
+
+
+def test_foot_sagittal_tracking_rewards_alternating_forward_swing():
+    env = _mock_env()
+    env.episode_length_buf[:] = 1
+    env.step_dt = 0.25
+    env.command_manager.command = torch.tensor([[0.5, 0.0, 0.0]])
+    env.scene["robot"].data.root_lin_vel_b.torch[:, 0] = 0.5
+    env.scene["robot"].data.body_link_vel_w.torch[:, :, :3] = torch.tensor([[[0.0, 0.0, 0.0], [0.9, 0.0, 0.0]]])
+    env.scene["robot"].data.body_link_pose_w.torch[:, 1, 2] = 0.07
+    asset_cfg = SceneEntityCfg("robot", body_ids=[0, 1])
+    sensor_cfg = SceneEntityCfg("contact_forces", body_ids=[0, 1])
+
+    assert torch.allclose(foot_sagittal_tracking(env, asset_cfg=asset_cfg, sensor_cfg=sensor_cfg), torch.ones(1), atol=1e-6)
+
+    env.scene["robot"].data.body_link_vel_w.torch[:, 1, 0] = 0.0
+    assert foot_sagittal_tracking(env, asset_cfg=asset_cfg, sensor_cfg=sensor_cfg).item() < 0.65
+
+    env.scene.sensors["contact_forces"].data.net_forces_w.torch[:, 1, 2] = 350.0
+    assert foot_sagittal_tracking(env, asset_cfg=asset_cfg, sensor_cfg=sensor_cfg).item() < 0.6
+
+
+def test_foot_sagittal_symmetry_rewards_feet_centered_around_base():
+    env = _mock_env()
+    env.command_manager.command = torch.tensor([[0.5, 0.0, 0.0]])
+    env.scene["robot"].data.body_link_pose_w.torch[:, 0, :3] = torch.tensor([[-0.12, 0.08, 0.0]])
+    env.scene["robot"].data.body_link_pose_w.torch[:, 1, :3] = torch.tensor([[0.12, -0.08, 0.0]])
+    asset_cfg = SceneEntityCfg("robot", body_ids=[0, 1])
+
+    assert torch.allclose(foot_sagittal_symmetry(env, asset_cfg=asset_cfg), torch.ones(1), atol=1e-6)
+
+    env.scene["robot"].data.body_link_pose_w.torch[:, 1, 0] = 0.35
+    assert foot_sagittal_symmetry(env, asset_cfg=asset_cfg).item() < 0.5
+
+
+def test_yaw_drift_penalty_is_gated_by_effective_yaw_command():
+    env = _mock_env()
+    env.common_step_counter = 0
+    env.command_manager.command = torch.tensor([[0.5, 0.0, 0.4]])
+    env.scene["robot"].data.root_ang_vel_b.torch[:, 2] = 0.2
+    curriculum_steps = (12000, 18000, 24000, 36000)
+
+    assert torch.allclose(yaw_drift_penalty(env, yaw_curriculum_steps=curriculum_steps), torch.tensor([0.04]))
+
+    env.common_step_counter = 36000
+    assert torch.allclose(yaw_drift_penalty(env, yaw_curriculum_steps=curriculum_steps), torch.zeros(1))
 
 
 def test_regularization_terms_return_expected_costs():

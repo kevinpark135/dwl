@@ -30,12 +30,12 @@ DEFAULT_QUINTIC_COEFFS = (0.0, 0.1, 5.0, -18.8, 12.0, 9.6)
 class DwlGaitCfg:
     """Configuration for the periodic gait reference.
 
-    The paper reports a 0.5 s swing trajectory. A full gait cycle is one swing
-    phase plus one stance phase, so the default cycle time is 1.0 s.
+    The paper reports a 0.5 s swing trajectory. The local default is slightly
+    slower than the paper baseline to discourage overly quick, short steps.
     """
 
-    cycle_time_s: float = 1.0
-    swing_time_s: float = 0.5
+    cycle_time_s: float = 1.2
+    swing_time_s: float = 0.6
     phase_offset: float = 0.0
     foot_height_coeffs: tuple[float, ...] = DEFAULT_QUINTIC_COEFFS
 

@@ -239,6 +239,9 @@ The DWL default direction is to keep `base_lin_vel` and `height_scan` out of the
 - `foot_velocity_tracking`: Tracks the quintic swing-foot vertical velocity reference.
 - `foot_lateral_tracking`: Rewards a narrow body-frame left/right foot corridor to discourage wide A-frame walking.
 - `foot_lateral_velocity`: Penalizes side-shuffling foot velocity while leaving forward swing motion free.
+- `foot_sagittal_tracking`: Rewards the expected swing foot moving forward relative to the base while the stance foot anchors backward, reducing one-foot pivot gaits.
+- `foot_sagittal_symmetry`: Rewards left/right feet staying balanced around the base in the sagittal axis.
+- `yaw_drift_penalty`: Penalizes unintended yaw drift most strongly while the staged yaw target is small.
 - `hip_deviation`: Penalizes excessive hip yaw/roll displacement and velocity, targeting bow-legged gait artifacts.
 - `default_joint_tracking`: Rewards staying near the default controlled-joint posture.
 - `energy_cost`: Computes `sum(|tau| * |qdot|)`.
@@ -247,7 +250,7 @@ The DWL default direction is to keep `base_lin_vel` and `height_scan` out of the
   The DWL cfg keeps the paper weight at `-0.01` but scales vertical acceleration by `10.0` before squaring so SI-unit accelerations do not dominate early learning.
 - `large_contact`: Penalizes excessive foot contact force.
 
-The gait helpers matter here because four rewards are phase-aware: `periodic_force`, `periodic_velocity`, `foot_height_tracking`, and `foot_velocity_tracking`. They must use the same clock, stance mask, and foot trajectory reference as the observations; otherwise the policy could observe one gait phase while rewards score another.
+The gait helpers matter here because five rewards are phase-aware: `periodic_force`, `periodic_velocity`, `foot_height_tracking`, `foot_velocity_tracking`, and `foot_sagittal_tracking`. They must use the same clock, stance mask, and foot trajectory reference as the observations; otherwise the policy could observe one gait phase while rewards score another.
 
 ## `events.py`
 
@@ -274,139 +277,15 @@ The event helpers use Isaac Lab 3.0-compatible signatures with `env_ids` as the
 second argument. PhysX/Warp index tensors passed back into simulation APIs are
 converted to `int32`.
 
-The DWL train cfg keeps terrain initialization at `max_init_terrain_level = 5`.
-Current stand-up debugging should not lower this value; balance fixes should
-come from reset, action, actuator, and reward settings unless the experiment is
-explicitly about terrain.
+The DWL train cfg currently starts at `max_init_terrain_level = 1` so distance
+curriculum can promote the policy after it learns stable forward translation.
 
 ## Update Log
 
-Major changes only. Each item records what changed and why.
+Major changes only. Commit hashes point to the local history when available.
 
-### Task and Baseline Setup
-
-Registered DWL train/play tasks and added a proprioception-only stock G1
-baseline. This gives a control run for separating DWL-specific issues from
-normal G1 locomotion issues.
-
-### Import-Safe Action Path
-
-Split action code into lightweight `actions.py` config and runtime
-`action_terms.py`. This avoids importing Isaac Sim/USD runtime modules before
-`SimulationApp` starts while preserving DWL delay and motor-offset behavior.
-
-### DWL Observation and RL Wiring
-
-Separated policy proprioception from privileged critic/decoder state, added
-history/delay buffers, and wired custom `DwlActorModel`, `DwlCriticModel`, and
-`DwlPPO` through Isaac Lab's supported `OnPolicyRunner`. Observation
-normalization is enabled to improve PPO conditioning.
-
-### Isaac Lab 3.0 Fixes
-
-Updated event signatures, PhysX/Warp index dtypes, and reward APIs for Isaac Lab
-3.0. Foot movement now uses vertical `body_lin_acc_w` with acceleration scaling,
-and foot velocity tracking follows the shared gait reference.
-
-### First Warm-Start Attempt
-
-Reduced early training difficulty after runs showed immediate torso contact and
-zero success rate. Friction/randomization/pushes were softened, balance rewards
-were strengthened, and gait rewards were weakened so the policy was not forced
-into stepping before it could balance.
-
-### Stand-First Phase Reverted
-
-The pure stand-only setup was removed because the intended behavior is not to
-stand forever, but to absorb spawn/contact transients and keep moving. Low-speed
-velocity commands and reduced gait rewards are active again, while standing
-rewards (`alive`, `double_support`, `base_motion_penalty`) remain only as weak
-stability aids.
-
-### Joint Range and Impact Absorption
-
-Restored terrain initialization to `max_init_terrain_level = 5` and marked it as
-fixed for future debugging. To let the robot catch itself after spawn, the G1
-soft joint position limit factor was raised to `1.0`, action scale was restored
-to `0.5`, and leg/ankle damping was increased.
-
-### Motion and Domain Randomization Reopened
-
-The robot was still too passive after spawn, so the cfg now encourages immediate
-joint use again. Observation corruption, reset noise, friction randomization,
-system delay, motor offset, motor strength randomization, and PD randomization
-were restored; initial action std was raised to `0.8`, entropy to `0.006`, and
-the remaining stand-still rewards were reduced to weak stability aids.
-
-### Exploration Boost
-
-The robot still kept its legs too quiet after spawn. Action scale, initial action
-std, and entropy were raised; zero forward commands were removed; gait/foot
-tracking rewards were strengthened; and default-pose, smoothness, energy, and
-foot-acceleration penalties were weakened so early rollouts actively try joint
-motion.
-
-### Immediate Action Fix
-
-The robot still tipped before visible leg response. The DWL action reset now
-restores default joint targets instead of zero targets, startup action delay is
-disabled for this phase, and gait/action exploration was raised again so the
-first sampled actions can reach the legs immediately.
-
-### Paper Dimension Alignment
-
-Matched the paper's Table I/VI/VIII settings for the DWL model path: encoder
-input remains `47`, privileged decoder/critic state is now `184`, height scan is
-`96`, network widths follow Table VI, and PPO coefficients follow Table VIII.
-
-### Locomotion Reward Rebalance
-
-The standing local optimum was too strong: the robot learned to remain upright
-without translating, which kept terrain curriculum stuck. Horizontal base
-velocity was removed from `base_motion_penalty` so commanded forward motion is
-not punished by a stability term. Standing-style rewards were reduced
-(`alive`, `orientation_tracking`, `base_height_tracking`, `default_joint_tracking`)
-and `double_support` was disabled as a positive reward.
-
-Velocity tracking is now the dominant objective: `lin_velocity_tracking` was
-raised to `4.0`, yaw tracking was raised to `1.5`, and swing-foot motion was
-made more important while foot/default/smoothness regularizers were weakened.
-Initial terrain difficulty was also lowered to `max_init_terrain_level = 1` so
-distance-based curriculum can promote the policy after it actually learns to
-move instead of starting on rough level 5 while stationary.
-
-### Forward Locomotion Curriculum
-
-Yaw command learning is now staged instead of fully active from the first PPO
-updates. With `num_steps_per_env = 24`, the first 300 iterations map to 7200
-policy steps, so policy yaw commands and yaw tracking are linearly ramped from
-zero to the sampled command across `yaw_warmup_steps = 7200`. The same warmed
-command is used for actor observations, privileged/critic observations, and
-`ang_velocity_tracking` so the policy and reward target do not disagree during
-the early straight-walk phase.
-
-Two forward-walking aids were added. `forward_progress` rewards positive
-body-frame x velocity only when the sampled forward command is above the
-movement threshold, and the reward is capped at the commanded speed so sprinting
-or torso-throwing cannot keep increasing the score. `commanded_swing_air_time`
-is also gated by forward command: it rewards expected swing-foot clearance,
-gives an air-time bonus on touchdown, and penalizes feet that stay airborne too
-long.
-
-The implementation keeps `orientation_tracking` and `base_height_tracking`
-enabled as low-weight guardrails so the policy cannot earn forward reward by
-falling forward. Tests were added for yaw warmup, reward wiring,
-`forward_progress`, and commanded swing air-time gating/touchdown behavior.
-
-### Gait Shape Regularization
-
-The first walking policy reached positive terrain curriculum but learned an
-awkward wide, A-frame gait. Three focused gait-shape terms were added:
-`foot_lateral_tracking` keeps feet near a narrow body-frame corridor,
-`foot_lateral_velocity` discourages side-shuffling, and `hip_deviation`
-specifically regularizes hip yaw/roll use. These are intentionally moderate so
-forward velocity and terrain promotion still dominate the task.
-
-Next check: run a short 1024-env training job and confirm `base_contact` drops,
-episode length increases, and the robot can survive the initial contact while
-tracking low-speed commands.
+- `418896c Add gait shape rewards`: Added lateral foot-corridor, side-shuffle, and hip yaw/roll regularization after the first walking policy learned a wide A-frame gait.
+- `6f8308a removed local optimum issue`: Rebalanced locomotion rewards away from upright standing and toward forward velocity, including capped `forward_progress` and commanded swing air-time.
+- `24f3878 removed local optimum issue`: Warmed yaw command learning so early training focuses on straight walking before turning.
+- `6dbc9eb Align DWL model dimensions with paper`: Matched DWL observation/model dimensions and PPO coefficients to the paper tables.
+- Current working tree after `418896c`: Narrowed target foot width to `0.16m`, slowed the gait reference to a `1.2s` cycle, added contact/clearance-aware sagittal foot tracking plus left/right sagittal symmetry, staged yaw targets at 500/750/1000/1500 iterations with gated yaw-drift suppression, softened linear-velocity tolerance to `2.5`, and relaxed the G1 default arm pose by lowering the elbow/shoulder defaults.

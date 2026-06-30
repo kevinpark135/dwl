@@ -22,6 +22,7 @@ from observations import (
     state_friction,
     state_push_force_torques,
     state_stance_mask,
+    yaw_curriculum_scale,
 )
 
 
@@ -91,6 +92,7 @@ def test_base_orientation_rpy_reads_robot_root_quat():
 
 def test_policy_clock_uses_episode_time():
     env = _mock_env(num_envs=2)
+    env.step_dt = 0.6
 
     assert torch.allclose(policy_clock(env), torch.tensor([[0.0, 1.0], [0.0, -1.0]]), atol=1.0e-6)
 
@@ -109,8 +111,28 @@ def test_policy_velocity_commands_warms_up_yaw_command():
     assert torch.allclose(policy_velocity_commands_yaw_warmup(env, warmup_steps=10), torch.tensor([[0.5, 0.0, 1.0]]))
 
 
+def test_policy_velocity_commands_uses_piecewise_yaw_curriculum():
+    env = _mock_env(num_envs=1)
+    env.command_manager = SimpleNamespace(get_command=lambda command_name: torch.tensor([[0.5, 0.0, 0.4]]))
+    curriculum_steps = (12000, 18000, 24000, 36000)
+
+    expected = [
+        (0, 0.0),
+        (12000, 0.25),
+        (18000, 0.5),
+        (24000, 0.75),
+        (36000, 1.0),
+    ]
+    for step, scale in expected:
+        env.common_step_counter = step
+        assert yaw_curriculum_scale(env, curriculum_steps) == scale
+        command = policy_velocity_commands_yaw_warmup(env, yaw_curriculum_steps=curriculum_steps)
+        assert torch.allclose(command, torch.tensor([[0.5, 0.0, 0.4 * scale]]))
+
+
 def test_state_stance_mask_uses_episode_time():
     env = _mock_env(num_envs=2)
+    env.step_dt = 0.6
 
     assert torch.equal(state_stance_mask(env), torch.tensor([[1.0, 0.0], [0.0, 1.0]]))
 

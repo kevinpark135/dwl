@@ -44,6 +44,10 @@ except ImportError:
 from isaaclab_assets import G1_MINIMAL_CFG  # isort: skip
 
 
+YAW_CURRICULUM_STEPS = (12000, 18000, 24000, 36000)
+"""Yaw curriculum at 500, 750, 1000, and 1500 PPO iterations for 24 steps/env."""
+
+
 @configclass
 class G1Observations:
     """DWL observation groups for policy and privileged/state inputs."""
@@ -54,7 +58,8 @@ class G1Observations:
 
         clock = ObsTerm(func=dwl_obs.delayed_policy_clock, params={"gait_cfg": DwlGaitCfg()})
         velocity_commands = ObsTerm(
-            func=dwl_obs.delayed_policy_velocity_commands, params={"command_name": "base_velocity"}
+            func=dwl_obs.delayed_policy_velocity_commands,
+            params={"command_name": "base_velocity", "yaw_curriculum_steps": YAW_CURRICULUM_STEPS},
         )
         joint_pos = ObsTerm(
             func=dwl_obs.delayed_policy_joint_pos,
@@ -91,7 +96,7 @@ class G1Observations:
         clock = ObsTerm(func=dwl_obs.policy_clock, params={"gait_cfg": DwlGaitCfg()})
         velocity_commands = ObsTerm(
             func=dwl_obs.policy_velocity_commands_yaw_warmup,
-            params={"command_name": "base_velocity", "warmup_steps": 7200},
+            params={"command_name": "base_velocity", "yaw_curriculum_steps": YAW_CURRICULUM_STEPS},
         )
         joint_pos = ObsTerm(func=dwl_obs.policy_joint_pos, params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG})
         joint_vel = ObsTerm(func=dwl_obs.policy_joint_vel, params={"asset_cfg": dwl_obs.DEFAULT_CONTROLLED_JOINT_CFG})
@@ -150,12 +155,22 @@ class G1Rewards(RewardsCfg):
     lin_velocity_tracking = RewTerm(
         func=dwl_rewards.lin_velocity_tracking,
         weight=4.0,
-        params={"command_name": "base_velocity", "tolerance": 3.0},
+        params={"command_name": "base_velocity", "tolerance": 2.5},
     )
     ang_velocity_tracking = RewTerm(
         func=dwl_rewards.ang_velocity_tracking,
-        weight=1.5,
-        params={"command_name": "base_velocity", "tolerance": 5.0, "yaw_warmup_steps": 7200},
+        weight=1.0,
+        params={"command_name": "base_velocity", "tolerance": 5.0, "yaw_curriculum_steps": YAW_CURRICULUM_STEPS},
+    )
+    yaw_drift_penalty = RewTerm(
+        func=dwl_rewards.yaw_drift_penalty,
+        weight=-0.15,
+        params={
+            "command_name": "base_velocity",
+            "yaw_curriculum_steps": YAW_CURRICULUM_STEPS,
+            "full_yaw_rate": 0.4,
+            "asset_cfg": dwl_obs.DEFAULT_ROBOT_CFG,
+        },
     )
     forward_progress = RewTerm(
         func=dwl_rewards.forward_progress,
@@ -180,16 +195,16 @@ class G1Rewards(RewardsCfg):
     )
     commanded_swing_air_time = RewTerm(
         func=dwl_rewards.commanded_swing_air_time,
-        weight=0.5,
+        weight=0.7,
         params={
             "command_name": "base_velocity",
             "gait_cfg": DwlGaitCfg(),
             "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG,
             "sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG,
             "min_command_x": 0.2,
-            "clearance_height": 0.06,
-            "target_air_time": 0.25,
-            "max_air_time": 0.6,
+            "clearance_height": 0.07,
+            "target_air_time": 0.4,
+            "max_air_time": 0.8,
         },
     )
     foot_height_tracking = RewTerm(
@@ -204,13 +219,38 @@ class G1Rewards(RewardsCfg):
     )
     foot_lateral_tracking = RewTerm(
         func=dwl_rewards.foot_lateral_tracking,
-        weight=0.5,
-        params={"asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "target_width": 0.22, "tolerance": 40.0},
+        weight=0.8,
+        params={"asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "target_width": 0.16, "tolerance": 70.0},
     )
     foot_lateral_velocity = RewTerm(
         func=dwl_rewards.foot_lateral_velocity,
-        weight=-0.02,
+        weight=-0.04,
         params={"asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG, "velocity_scale": 1.0},
+    )
+    foot_sagittal_tracking = RewTerm(
+        func=dwl_rewards.foot_sagittal_tracking,
+        weight=0.8,
+        params={
+            "command_name": "base_velocity",
+            "gait_cfg": DwlGaitCfg(),
+            "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG,
+            "sensor_cfg": dwl_obs.DEFAULT_CONTACT_SENSOR_CFG,
+            "min_command_x": 0.2,
+            "swing_speed_scale": 0.8,
+            "stance_speed_scale": 1.0,
+            "tolerance": 4.0,
+            "clearance_height": 0.07,
+        },
+    )
+    foot_sagittal_symmetry = RewTerm(
+        func=dwl_rewards.foot_sagittal_symmetry,
+        weight=0.4,
+        params={
+            "command_name": "base_velocity",
+            "asset_cfg": dwl_obs.DEFAULT_FOOT_BODY_CFG,
+            "min_command_x": 0.2,
+            "tolerance": 16.0,
+        },
     )
     hip_deviation = RewTerm(
         func=dwl_rewards.hip_deviation,
@@ -260,6 +300,15 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.scene.robot = G1_MINIMAL_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.robot.init_state.pos = (0.0, 0.0, 0.74)
         self.scene.robot.init_state.rot = (0.0, 0.0, 0.0, 1.0)
+        self.scene.robot.init_state.joint_pos.update(
+            {
+                ".*_elbow_pitch_joint": 0.35,
+                "left_shoulder_roll_joint": 0.08,
+                "left_shoulder_pitch_joint": 0.15,
+                "right_shoulder_roll_joint": -0.08,
+                "right_shoulder_pitch_joint": 0.15,
+            }
+        )
         # Allow the policy to use the full URDF joint range when catching balance.
         self.scene.robot.soft_joint_pos_limit_factor = 1.0
         # Make the low-level PD less brittle on impact: keep enough stiffness to
@@ -396,7 +445,7 @@ class G1DwlEnvCfg(LocomotionVelocityRoughEnvCfg):
 
         # Commands: avoid the zero-command corner so early rollouts have a reason
         # to move their legs instead of discovering a passive crouch.
-        self.commands.base_velocity.ranges.lin_vel_x = (0.4, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_x = (0.5, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
         self.commands.base_velocity.ranges.ang_vel_z = (-0.4, 0.4)
 

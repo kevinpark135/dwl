@@ -78,11 +78,43 @@ def _yaw_warmup_scale(env: "ManagerBasedRLEnv", warmup_steps: int) -> float:
     return min(max(common_step / float(warmup_steps), 0.0), 1.0)
 
 
+def _yaw_curriculum_scale(env: "ManagerBasedRLEnv", curriculum_steps: tuple[int, int, int, int] | None) -> float:
+    if curriculum_steps is None:
+        return 1.0
+    start_25, start_50, start_75, start_full = curriculum_steps
+    common_step = int(getattr(env, "common_step_counter", 0))
+    if common_step < start_25:
+        return 0.0
+    if common_step < start_50:
+        return 0.25
+    if common_step < start_75:
+        return 0.5
+    if common_step < start_full:
+        return 0.75
+    return 1.0
+
+
+def _effective_yaw_command(
+    env: "ManagerBasedRLEnv",
+    command_name: str,
+    yaw_warmup_steps: int,
+    yaw_curriculum_steps: tuple[int, int, int, int] | None,
+) -> torch.Tensor:
+    command_yaw = env.command_manager.get_command(command_name)[:, 2]
+    scale = _yaw_curriculum_scale(env, yaw_curriculum_steps)
+    if yaw_curriculum_steps is None:
+        scale = _yaw_warmup_scale(env, yaw_warmup_steps)
+    return command_yaw * scale
+
+
 def _command_rpy_rate_with_yaw_warmup(
-    env: "ManagerBasedRLEnv", command_name: str, warmup_steps: int
+    env: "ManagerBasedRLEnv",
+    command_name: str,
+    warmup_steps: int,
+    yaw_curriculum_steps: tuple[int, int, int, int] | None = None,
 ) -> torch.Tensor:
     command_rpy = _command_rpy_rate(env, command_name)
-    command_rpy[:, 2] = command_rpy[:, 2] * _yaw_warmup_scale(env, warmup_steps)
+    command_rpy[:, 2] = _effective_yaw_command(env, command_name, warmup_steps, yaw_curriculum_steps)
     return command_rpy
 
 
@@ -201,13 +233,31 @@ def ang_velocity_tracking(
     command_name: str = "base_velocity",
     tolerance: float = 7.0,
     yaw_warmup_steps: int = 7200,
+    yaw_curriculum_steps: tuple[int, int, int, int] | None = None,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
     """Track commanded yaw velocity while keeping roll/pitch angular velocity near zero."""
 
     asset = env.scene[asset_cfg.name]
-    command_rpy = _command_rpy_rate_with_yaw_warmup(env, command_name, yaw_warmup_steps)
+    command_rpy = _command_rpy_rate_with_yaw_warmup(env, command_name, yaw_warmup_steps, yaw_curriculum_steps)
     return tracking_exp(asset.data.root_ang_vel_b.torch[:, :3] - command_rpy, tolerance)
+
+
+def yaw_drift_penalty(
+    env: "ManagerBasedRLEnv",
+    command_name: str = "base_velocity",
+    yaw_warmup_steps: int = 7200,
+    yaw_curriculum_steps: tuple[int, int, int, int] | None = None,
+    full_yaw_rate: float = 0.4,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Penalize unintended yaw drift most strongly while the yaw target is small."""
+
+    asset = env.scene[asset_cfg.name]
+    yaw_rate = asset.data.root_ang_vel_b.torch[:, 2]
+    effective_yaw = torch.abs(_effective_yaw_command(env, command_name, yaw_warmup_steps, yaw_curriculum_steps))
+    straight_gate = 1.0 - torch.clamp(effective_yaw / full_yaw_rate, min=0.0, max=1.0)
+    return torch.square(yaw_rate) * straight_gate
 
 
 def orientation_tracking(
@@ -362,8 +412,8 @@ def foot_velocity_tracking(
 
 def foot_lateral_tracking(
     env: "ManagerBasedRLEnv",
-    target_width: float = 0.22,
-    tolerance: float = 40.0,
+    target_width: float = 0.16,
+    tolerance: float = 70.0,
     asset_cfg: SceneEntityCfg = DEFAULT_FOOT_BODY_CFG,
 ) -> torch.Tensor:
     """Reward a natural left/right foot corridor instead of a wide A-frame stance."""
@@ -397,6 +447,80 @@ def foot_lateral_velocity(
     _, foot_vel_w = _foot_pos_vel(env, asset_cfg)
     foot_vel_b = _yaw_rotate_inverse(asset, foot_vel_w[..., :3])
     return torch.sum(torch.square(foot_vel_b[..., 1] / velocity_scale), dim=-1)
+
+
+def foot_sagittal_tracking(
+    env: "ManagerBasedRLEnv",
+    command_name: str = "base_velocity",
+    gait_cfg: DwlGaitCfg = DwlGaitCfg(),
+    asset_cfg: SceneEntityCfg = DEFAULT_FOOT_BODY_CFG,
+    sensor_cfg: SceneEntityCfg = DEFAULT_CONTACT_SENSOR_CFG,
+    min_command_x: float = 0.2,
+    swing_speed_scale: float = 0.8,
+    stance_speed_scale: float = 1.0,
+    tolerance: float = 4.0,
+    contact_threshold: float = 1.0,
+    clearance_height: float = 0.07,
+    swing_contact_penalty_scale: float = 0.5,
+    baseline_attr: str = "dwl_foot_height_baseline",
+) -> torch.Tensor:
+    """Reward alternating forward swing instead of pivoting around one planted foot."""
+
+    asset = env.scene[asset_cfg.name]
+    command_x = env.command_manager.get_command(command_name)[:, 0].clamp_min(0.0)
+    gate = (command_x > min_command_x).to(dtype=asset.data.root_lin_vel_b.torch.dtype)
+
+    foot_pos_w, foot_vel_w = _foot_pos_vel(env, asset_cfg)
+    foot_vel_b = _yaw_rotate_inverse(asset, foot_vel_w[..., :3])
+    root_vel_b = asset.data.root_lin_vel_b.torch[:, None, :3]
+    foot_rel_vel_b = foot_vel_b - root_vel_b
+
+    stance = stance_mask(_episode_time_s(env), gait_cfg.cycle_time_s, gait_cfg.phase_offset)
+    swing = 1.0 - stance
+    target_forward = command_x[:, None] * swing_speed_scale
+    target_backward = -command_x[:, None] * stance_speed_scale
+    target_rel_x = swing * target_forward + stance * target_backward
+    error = foot_rel_vel_b[..., 0] - target_rel_x
+
+    baseline = getattr(env, baseline_attr, None)
+    if baseline is None:
+        baseline = torch.zeros((_num_envs(env), foot_pos_w.shape[1]), device=foot_pos_w.device, dtype=foot_pos_w.dtype)
+    foot_height = foot_pos_w[..., 2] - baseline
+    clearance = torch.clamp(foot_height / clearance_height, min=0.0, max=1.0)
+    contact = (_foot_force_norm(env, sensor_cfg) > contact_threshold).to(dtype=foot_vel_b.dtype)
+    swing_quality = swing * clearance * (1.0 - contact)
+    stance_quality = stance * contact
+    quality = swing_quality + stance_quality
+
+    per_foot_reward = torch.exp(-tolerance * torch.square(error))
+    quality_sum = torch.sum(quality, dim=-1)
+    weighted_reward = torch.sum(quality * per_foot_reward, dim=-1) / torch.clamp(quality_sum, min=1.0)
+    swing_contact_penalty = swing_contact_penalty_scale * torch.clamp(torch.sum(swing * contact, dim=-1), min=0.0, max=1.0)
+    weighted_reward = weighted_reward * torch.clamp(1.0 - swing_contact_penalty, min=0.0)
+    return gate * torch.where(quality_sum > 0.0, weighted_reward, torch.zeros_like(weighted_reward))
+
+
+def foot_sagittal_symmetry(
+    env: "ManagerBasedRLEnv",
+    command_name: str = "base_velocity",
+    asset_cfg: SceneEntityCfg = DEFAULT_FOOT_BODY_CFG,
+    min_command_x: float = 0.2,
+    tolerance: float = 16.0,
+) -> torch.Tensor:
+    """Reward left/right feet staying balanced around the base in the sagittal axis."""
+
+    asset = env.scene[asset_cfg.name]
+    command_x = env.command_manager.get_command(command_name)[:, 0].clamp_min(0.0)
+    gate = (command_x > min_command_x).to(dtype=asset.data.root_lin_vel_b.torch.dtype)
+
+    foot_pos_w, _ = _foot_pos_vel(env, asset_cfg)
+    rel_foot_pos_w = foot_pos_w - asset.data.root_pos_w.torch[:, None, :3]
+    foot_pos_b = _yaw_rotate_inverse(asset, rel_foot_pos_w)
+    if foot_pos_b.shape[1] < 2:
+        return torch.zeros(_num_envs(env), device=foot_pos_b.device, dtype=foot_pos_b.dtype)
+
+    center_error = foot_pos_b[:, 0, 0] + foot_pos_b[:, 1, 0]
+    return gate * torch.exp(-tolerance * torch.square(center_error))
 
 
 def hip_deviation(

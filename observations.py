@@ -206,25 +206,55 @@ def yaw_warmup_scale(env: "ManagerBasedEnv", warmup_steps: int = 7200) -> float:
     return min(max(common_step / float(warmup_steps), 0.0), 1.0)
 
 
+def yaw_curriculum_scale(
+    env: "ManagerBasedEnv", curriculum_steps: tuple[int, int, int, int] | None = None
+) -> float:
+    """Return piecewise yaw scale for staged turning curriculum."""
+
+    if curriculum_steps is None:
+        return 1.0
+    start_25, start_50, start_75, start_full = curriculum_steps
+    common_step = int(getattr(env, "common_step_counter", 0))
+    if common_step < start_25:
+        return 0.0
+    if common_step < start_50:
+        return 0.25
+    if common_step < start_75:
+        return 0.5
+    if common_step < start_full:
+        return 0.75
+    return 1.0
+
+
 def policy_velocity_commands_yaw_warmup(
-    env: "ManagerBasedEnv", command_name: str = "base_velocity", warmup_steps: int = 7200
+    env: "ManagerBasedEnv",
+    command_name: str = "base_velocity",
+    warmup_steps: int = 7200,
+    yaw_curriculum_steps: tuple[int, int, int, int] | None = None,
 ) -> torch.Tensor:
     """Return velocity commands with yaw gradually enabled after warmup."""
 
     command = policy_velocity_commands(env, command_name).clone()
-    command[:, 2] = command[:, 2] * yaw_warmup_scale(env, warmup_steps)
+    scale = yaw_curriculum_scale(env, yaw_curriculum_steps)
+    if yaw_curriculum_steps is None:
+        scale = yaw_warmup_scale(env, warmup_steps)
+    command[:, 2] = command[:, 2] * scale
     return command
 
 
 def delayed_policy_velocity_commands(
-    env: "ManagerBasedEnv", command_name: str = "base_velocity", max_delay_steps: int = 4, yaw_warmup_steps: int = 7200
+    env: "ManagerBasedEnv",
+    command_name: str = "base_velocity",
+    max_delay_steps: int = 4,
+    yaw_warmup_steps: int = 7200,
+    yaw_curriculum_steps: tuple[int, int, int, int] | None = None,
 ) -> torch.Tensor:
     """Return delayed commanded linear/yaw velocity for the policy."""
 
     return delayed_policy_observation(
         env,
         "velocity_commands",
-        policy_velocity_commands_yaw_warmup(env, command_name, yaw_warmup_steps),
+        policy_velocity_commands_yaw_warmup(env, command_name, yaw_warmup_steps, yaw_curriculum_steps),
         max_delay_steps=max_delay_steps,
     )
 

@@ -56,13 +56,14 @@ def test_quintic_reference_matches_table_iv_boundaries():
 
 def test_foot_references_are_zero_for_stance_foot():
     cfg = DwlGaitCfg()
-    time_s = torch.tensor([0.25, 0.75])
+    time_s = torch.tensor([0.3, 0.9])
 
     heights = foot_height_reference(time_s, cfg)
     velocities = foot_velocity_reference(time_s, cfg)
     accelerations = foot_acceleration_reference(time_s, cfg)
+    mid_swing_height = quintic_height(torch.tensor([0.3])).squeeze(0)
 
-    assert torch.allclose(heights[:, 0], torch.tensor([0.0, 0.1]), atol=1.0e-6)
-    assert torch.allclose(heights[:, 1], torch.tensor([0.1, 0.0]), atol=1.0e-6)
+    assert torch.allclose(heights[:, 0], torch.stack((torch.tensor(0.0), mid_swing_height)), atol=1.0e-6)
+    assert torch.allclose(heights[:, 1], torch.stack((mid_swing_height, torch.tensor(0.0))), atol=1.0e-6)
     assert velocities.shape == (2, 2)
     assert accelerations.shape == (2, 2)

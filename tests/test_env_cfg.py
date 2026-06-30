@@ -3,7 +3,7 @@
 
 from actions import DwlJointPositionActionCfg
 from baseline_env_cfg import G1ProprioceptiveBaselineEnvCfg, G1ProprioceptiveBaselineEnvCfg_PLAY
-from dwl_env_cfg import G1DwlEnvCfg, G1DwlEnvCfg_PLAY
+from dwl_env_cfg import G1DwlEnvCfg, G1DwlEnvCfg_PLAY, YAW_CURRICULUM_STEPS
 from observations import CONTROLLED_LEG_JOINT_NAMES
 
 
@@ -42,16 +42,27 @@ def test_dwl_env_cfg_uses_controlled_leg_actions_and_dwl_rewards():
     assert cfg.rewards.double_support.weight == 0.0
     assert cfg.rewards.base_motion_penalty.weight == -0.01
     assert cfg.rewards.lin_velocity_tracking.weight == 4.0
-    assert cfg.rewards.ang_velocity_tracking.params["yaw_warmup_steps"] == 7200
+    assert cfg.rewards.lin_velocity_tracking.params["tolerance"] == 2.5
+    assert cfg.observations.policy.velocity_commands.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
+    assert cfg.observations.privileged.velocity_commands.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
+    assert cfg.rewards.ang_velocity_tracking.weight == 1.0
+    assert cfg.rewards.ang_velocity_tracking.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
+    assert cfg.rewards.yaw_drift_penalty.weight == -0.15
+    assert cfg.rewards.yaw_drift_penalty.params["yaw_curriculum_steps"] == YAW_CURRICULUM_STEPS
     assert cfg.rewards.forward_progress.weight == 1.0
     assert cfg.rewards.periodic_force.weight == 0.6
     assert cfg.rewards.periodic_velocity.weight == 1.0
-    assert cfg.rewards.commanded_swing_air_time.weight == 0.5
-    assert cfg.rewards.commanded_swing_air_time.params["max_air_time"] == 0.6
+    assert cfg.rewards.commanded_swing_air_time.weight == 0.7
+    assert cfg.rewards.commanded_swing_air_time.params["target_air_time"] == 0.4
+    assert cfg.rewards.commanded_swing_air_time.params["max_air_time"] == 0.8
     assert cfg.rewards.foot_height_tracking.weight == 0.3
     assert cfg.rewards.foot_velocity_tracking.weight == 0.2
-    assert cfg.rewards.foot_lateral_tracking.weight == 0.5
-    assert cfg.rewards.foot_lateral_velocity.weight == -0.02
+    assert cfg.rewards.foot_lateral_tracking.weight == 0.8
+    assert cfg.rewards.foot_lateral_tracking.params["target_width"] == 0.16
+    assert cfg.rewards.foot_lateral_velocity.weight == -0.04
+    assert cfg.rewards.foot_sagittal_tracking.weight == 0.8
+    assert cfg.rewards.foot_sagittal_tracking.params["sensor_cfg"] is not None
+    assert cfg.rewards.foot_sagittal_symmetry.weight == 0.4
     assert cfg.rewards.hip_deviation.weight == -0.03
     assert cfg.rewards.default_joint_tracking.weight == 0.02
     assert cfg.rewards.action_smoothness.weight == -0.0002
@@ -69,8 +80,9 @@ def test_dwl_env_cfg_wires_dwl_events():
     assert cfg.events.physics_material.params["static_friction_range"] == (0.2, 2.0)
     assert cfg.events.reset_robot_joints.params["position_range"] == (-0.05, 0.05)
     assert cfg.events.reset_robot_joints.params["velocity_range"] == (-0.1, 0.1)
-    assert cfg.commands.base_velocity.ranges.lin_vel_x == (0.4, 1.0)
+    assert cfg.commands.base_velocity.ranges.lin_vel_x == (0.5, 1.0)
     assert cfg.commands.base_velocity.ranges.ang_vel_z == (-0.4, 0.4)
+    assert cfg.scene.robot.init_state.joint_pos[".*_elbow_pitch_joint"] == 0.35
     assert cfg.events.reset_base.params["pose_range"]["yaw"] == (-0.1, 0.1)
     assert cfg.events.reset_base.params["velocity_range"]["roll"] == (-0.05, 0.05)
     assert cfg.scene.terrain.max_init_terrain_level == 1
