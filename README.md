@@ -36,60 +36,16 @@ DWL task and environment configuration built for Isaac Lab. Copy this repository
 
 ## Local Train/Play CLI
 
-All commands below are one-line commands for this machine's Isaac Lab checkout at `/home/kevinpark135/IsaacLab`.
-
-Smoke-test training, small env count and tiny iteration count:
-
-```bash
-./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-v0 --num_envs 64 --max_iterations 5 --headless
-```
-
-Short debug training:
-
-```bash
-./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-v0 --num_envs 128 --max_iterations 50 --headless
-```
-
-Medium training run:
-
-```bash
-./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-v0 --num_envs 1024 --max_iterations 500 --headless
-```
-
-DWL full training run:
-
-```bash
-./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
-```
-
-Full PhysX-style training:
-
-```bash
-./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 1000 --headless
-```
-
-Long Newton-style training budget:
+DWL training run:
 
 ```bash
 ./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-v0 --num_envs 4096 --max_iterations 5000 --headless
 ```
 
-Play latest checkpoint from `logs/rsl_rl/g1_dwl`:
-
-```bash
-./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 32 --viz kit
-```
-
-Play latest checkpoint with fewer envs:
-
-```bash
-./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 8 --viz kit
-```
-
 Play a specific checkpoint:
 
 ```bash
-./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 50 --checkpoint /home/kevinpark135/IsaacLab/logs/rsl_rl/g1_dwl/<RUN_DIR>/model_<ITER>.pt --viz kit
+./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 16 --checkpoint /home/kevinpark135/IsaacLab/logs/rsl_rl/g1_dwl/<RUN_DIR>/model_<ITER>.pt --viz kit
 ```
 
 ## Baseline Cases
@@ -122,12 +78,6 @@ Run all four baselines sequentially:
 
 ```bash
 NUM_ENVS=4096 MAX_ITERATIONS=1000 ./scripts/train_baselines.sh
-```
-
-Run one baseline through the helper script:
-
-```bash
-TASK=Isaac-Velocity-DWL-HeightScanActor-G1-v0 NUM_ENVS=4096 MAX_ITERATIONS=1000 ./scripts/train_baseline.sh
 ```
 
 ## File Layout
