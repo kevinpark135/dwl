@@ -2,12 +2,10 @@
 set -euo pipefail
 
 NUM_ENVS="${NUM_ENVS:-4096}"
-MAX_ITERATIONS="${MAX_ITERATIONS:-3000}"
+MAX_ITERATIONS="${MAX_ITERATIONS:-1000}"
 
 TASKS=(
-  "Isaac-Velocity-DWL-PPO-NoDenoising-G1-v0"
   "Isaac-Velocity-DWL-StockProprio-G1-v0"
-  "Isaac-Velocity-DWL-HeightScanActor-G1-v0"
   "Isaac-Velocity-DWL-PrivilegedActor-G1-v0"
 )
 

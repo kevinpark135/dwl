@@ -3,9 +3,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Baseline and ablation environment configurations for G1 locomotion."""
+"""Baseline environment configurations for G1 locomotion."""
 
-from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.utils.configclass import configclass
 
 from isaaclab_tasks.manager_based.locomotion.velocity.config.g1.rough_env_cfg import (
@@ -14,49 +13,9 @@ from isaaclab_tasks.manager_based.locomotion.velocity.config.g1.rough_env_cfg im
 )
 
 try:
-    from . import observations as dwl_obs
     from .dwl_env_cfg import G1DwlEnvCfg, G1DwlEnvCfg_PLAY
 except ImportError:
-    import observations as dwl_obs
     from dwl_env_cfg import G1DwlEnvCfg, G1DwlEnvCfg_PLAY
-
-
-@configclass
-class G1DwlPpoNoDenoisingEnvCfg(G1DwlEnvCfg):
-    """DWL task trained with plain asymmetric PPO and no denoising decoder."""
-
-
-@configclass
-class G1DwlPpoNoDenoisingEnvCfg_PLAY(G1DwlEnvCfg_PLAY):
-    """Play configuration for the plain PPO/no-denoising ablation."""
-
-
-@configclass
-class G1DwlHeightScanActorEnvCfg(G1DwlEnvCfg):
-    """DWL task where the actor directly receives the terrain height scan."""
-
-    def __post_init__(self):
-        super().__post_init__()
-
-        self.observations.policy.height_scan = ObsTerm(
-            func=dwl_obs.state_height_scan,
-            params={"sensor_cfg": dwl_obs.DEFAULT_HEIGHT_SCAN_CFG},
-            clip=(-1.0, 1.0),
-        )
-
-
-@configclass
-class G1DwlHeightScanActorEnvCfg_PLAY(G1DwlEnvCfg_PLAY):
-    """Play configuration for the height-scan actor ablation."""
-
-    def __post_init__(self):
-        super().__post_init__()
-
-        self.observations.policy.height_scan = ObsTerm(
-            func=dwl_obs.state_height_scan,
-            params={"sensor_cfg": dwl_obs.DEFAULT_HEIGHT_SCAN_CFG},
-            clip=(-1.0, 1.0),
-        )
 
 
 @configclass
@@ -71,21 +30,28 @@ class G1DwlPrivilegedActorEnvCfg_PLAY(G1DwlEnvCfg_PLAY):
 
 @configclass
 class G1ProprioceptiveBaselineEnvCfg(G1RoughEnvCfg):
-    """Stock G1 rough-locomotion task without exteroceptive policy observations."""
+    """Stock G1 rough-locomotion PPO with only proprioceptive actor observations.
+
+    The stock Isaac Lab rough locomotion policy includes both base linear
+    velocity and height scan. Both are removed here so this baseline cannot use
+    privileged velocity or exteroceptive terrain information.
+    """
 
     def __post_init__(self):
         super().__post_init__()
 
+        self.observations.policy.base_lin_vel = None
         self.observations.policy.height_scan = None
         self.scene.height_scanner = None
 
 
 @configclass
 class G1ProprioceptiveBaselineEnvCfg_PLAY(G1RoughEnvCfg_PLAY):
-    """Play configuration for the proprioception-only stock PPO baseline."""
+    """Play configuration for the true proprioception-only stock PPO baseline."""
 
     def __post_init__(self):
         super().__post_init__()
 
+        self.observations.policy.base_lin_vel = None
         self.observations.policy.height_scan = None
         self.scene.height_scanner = None

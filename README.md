@@ -10,12 +10,8 @@ DWL task and environment configuration built for Isaac Lab. Copy this repository
 | --- | --- |
 | `Isaac-Velocity-DWL-G1-v0` | Main DWL training task. |
 | `Isaac-Velocity-DWL-G1-Play-v0` | Main DWL play/evaluation task. |
-| `Isaac-Velocity-DWL-PPO-NoDenoising-G1-v0` | Plain PPO baseline without DWL denoising decoder. |
-| `Isaac-Velocity-DWL-PPO-NoDenoising-G1-Play-v0` | Play/evaluation task for the no-denoising PPO baseline. |
-| `Isaac-Velocity-DWL-StockProprio-G1-v0` | Stock G1 PPO proprioception-only baseline. |
-| `Isaac-Velocity-DWL-StockProprio-G1-Play-v0` | Play/evaluation task for the stock proprioception baseline. |
-| `Isaac-Velocity-DWL-HeightScanActor-G1-v0` | Baseline where the actor directly receives terrain height scan. |
-| `Isaac-Velocity-DWL-HeightScanActor-G1-Play-v0` | Play/evaluation task for the height-scan actor baseline. |
+| `Isaac-Velocity-DWL-StockProprio-G1-v0` | True stock PPO proprioception-only baseline with no base linear velocity and no height scan. |
+| `Isaac-Velocity-DWL-StockProprio-G1-Play-v0` | Play/evaluation task for the true proprioception-only baseline. |
 | `Isaac-Velocity-DWL-PrivilegedActor-G1-v0` | Oracle baseline where the actor receives privileged state. |
 | `Isaac-Velocity-DWL-PrivilegedActor-G1-Play-v0` | Play/evaluation task for the privileged actor baseline. |
 
@@ -50,22 +46,10 @@ Play a specific checkpoint:
 
 ## Baseline Cases
 
-PPO without denoising decoder:
-
-```bash
-./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-PPO-NoDenoising-G1-v0 --num_envs 4096 --max_iterations 1000 --headless
-```
-
-Stock G1 PPO proprioception-only:
+True stock G1 PPO proprioception-only:
 
 ```bash
 ./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-StockProprio-G1-v0 --num_envs 4096 --max_iterations 1000 --headless
-```
-
-Height-scan actor:
-
-```bash
-./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-HeightScanActor-G1-v0 --num_envs 4096 --max_iterations 1000 --headless
 ```
 
 Privileged actor oracle:
@@ -74,7 +58,7 @@ Privileged actor oracle:
 ./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-PrivilegedActor-G1-v0 --num_envs 4096 --max_iterations 1000 --headless
 ```
 
-Run all four baselines sequentially:
+Run both baselines sequentially:
 
 ```bash
 NUM_ENVS=4096 MAX_ITERATIONS=1000 ./scripts/train_baselines.sh
@@ -327,7 +311,7 @@ listing every small constant change.
 
 | Focus | Issue | Change |
 | --- | --- | --- |
-| Baseline cases | Needed clean executable comparison tasks after DWL began walking reliably. | Added four train/play baseline families: `PPO-NoDenoising`, `StockProprio`, `HeightScanActor`, and `PrivilegedActor`; documented 4096-env/1000-iteration CLIs; removed the old `DwlBaseline` aliases. |
+| Baseline cases | Needed a smaller and cleaner comparison set after DWL began walking reliably. | Kept two baseline families: true `StockProprio` PPO with no base linear velocity or height scan, and `PrivilegedActor` oracle with full privileged actor input. |
 | Long-run stabilization prep | Rough-terrain learning became jumpy after reward-scale alignment produced visible walking. | Foot-height rewards now refresh a reset-time terrain-relative baseline; DWL uses a conservative terrain curriculum that promotes on sustained progress, demotes only clear short base-contact failures, and caps early terrain levels by global step. |
 | Standing local optimum | Checkpoint play still showed standing or creeping in place on commanded forward tasks. | Sharpened forward tracking, increased capped forward-progress reward, and made the low-speed penalty scale against a command-relative speed floor. |
 | Post-spike locomotion stabilization | A sharp `base_contact` spike near the first yaw-curriculum step led to near-stationary gait. | Temporarily disabled yaw commands, kept curriculum terrain init, gated swing air-time by real forward speed/uprightness, added command-gated low-speed penalty, added torso-contact penalty, and removed dead `double_support`/yaw-frame wrapper plumbing. |
