@@ -19,6 +19,18 @@ DWL task and environment configuration built for Isaac Lab. Copy this repository
 | `Isaac-Velocity-DWL-PrivilegedActor-G1-v0` | Oracle baseline where the actor receives privileged state. |
 | `Isaac-Velocity-DWL-PrivilegedActor-G1-Play-v0` | Play/evaluation task for the privileged actor baseline. |
 
+## Base Isaac Environment
+
+| Item | Value |
+| --- | --- |
+| Isaac Lab checkout | `/home/kevinpark135/IsaacLab` |
+| Task package path | `source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion/velocity/config/dwl` |
+| Parent environment config | `isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg:LocomotionVelocityRoughEnvCfg` |
+| Stock G1 reference config | `isaaclab_tasks.manager_based.locomotion.velocity.config.g1.rough_env_cfg:G1RoughEnvCfg` |
+| Robot asset | `isaaclab_assets:G1_MINIMAL_CFG` |
+| Gym entry point | `isaaclab.envs:ManagerBasedRLEnv` |
+| RL library | `rsl_rl` through Isaac Lab's train/play CLI |
+
 ## Local Train/Play CLI
 
 All commands below are one-line commands for this machine's Isaac Lab checkout at `/home/kevinpark135/IsaacLab`.
@@ -62,19 +74,19 @@ Long Newton-style training budget:
 Play latest checkpoint from `logs/rsl_rl/g1_dwl`:
 
 ```bash
-./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 32
+./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 32 --viz kit
 ```
 
 Play latest checkpoint with fewer envs:
 
 ```bash
-./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 8
+./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 8 --viz kit
 ```
 
 Play a specific checkpoint:
 
 ```bash
-./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 50 --checkpoint /home/kevinpark135/IsaacLab/logs/rsl_rl/g1_dwl/<RUN_DIR>/model_<ITER>.pt
+./isaaclab.sh play --rl_library rsl_rl --task Isaac-Velocity-DWL-G1-Play-v0 --num_envs 50 --checkpoint /home/kevinpark135/IsaacLab/logs/rsl_rl/g1_dwl/<RUN_DIR>/model_<ITER>.pt --viz kit
 ```
 
 ## Baseline Cases
