@@ -91,6 +91,7 @@ class G1ProprioceptiveBaselinePPORunnerCfg(RslRlOnPolicyRunnerCfg):
     max_iterations = preset(default=3000, newton=5000)
     save_interval = 50
     experiment_name = "g1_proprio_baseline"
+    obs_groups = {"actor": ["policy"], "critic": ["policy"]}
     actor = RslRlMLPModelCfg(
         hidden_dims=[512, 256, 128],
         activation="elu",
@@ -116,3 +117,43 @@ class G1ProprioceptiveBaselinePPORunnerCfg(RslRlOnPolicyRunnerCfg):
         desired_kl=0.01,
         max_grad_norm=1.0,
     )
+
+
+@configclass
+class G1DwlPpoNoDenoisingPPORunnerCfg(G1ProprioceptiveBaselinePPORunnerCfg):
+    """Plain asymmetric PPO on the DWL task, without the DWL decoder losses."""
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.experiment_name = "g1_dwl_ppo_no_denoising"
+        self.obs_groups = {"actor": ["policy"], "critic": ["privileged"]}
+        self.actor.obs_normalization = True
+        self.critic.hidden_dims = [512, 512, 256]
+        self.critic.obs_normalization = True
+        self.algorithm.value_loss_coef = 5.0
+        self.algorithm.entropy_coef = 0.005
+        self.algorithm.num_learning_epochs = 2
+        self.algorithm.learning_rate = 1.0e-5
+        self.algorithm.gamma = 0.995
+
+
+@configclass
+class G1DwlHeightScanActorPPORunnerCfg(G1DwlPpoNoDenoisingPPORunnerCfg):
+    """Plain asymmetric PPO where the actor also gets direct terrain height scans."""
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.experiment_name = "g1_dwl_height_scan_actor"
+
+
+@configclass
+class G1DwlPrivilegedActorPPORunnerCfg(G1DwlPpoNoDenoisingPPORunnerCfg):
+    """Oracle plain PPO where both actor and critic consume privileged state."""
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.experiment_name = "g1_dwl_privileged_actor"
+        self.obs_groups = {"actor": ["privileged"], "critic": ["privileged"]}

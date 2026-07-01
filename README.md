@@ -8,8 +8,18 @@ DWL task and environment configuration built for Isaac Lab. Copy this repository
 
 - Isaac-Velocity-DWL-G1-v0
 - Isaac-Velocity-DWL-G1-Play-v0
+- Isaac-Velocity-DWL-PPO-NoDenoising-G1-v0
+- Isaac-Velocity-DWL-PPO-NoDenoising-G1-Play-v0
+- Isaac-Velocity-DWL-StockProprio-G1-v0
+- Isaac-Velocity-DWL-StockProprio-G1-Play-v0
+- Isaac-Velocity-DWL-HeightScanActor-G1-v0
+- Isaac-Velocity-DWL-HeightScanActor-G1-Play-v0
+- Isaac-Velocity-DWL-PrivilegedActor-G1-v0
+- Isaac-Velocity-DWL-PrivilegedActor-G1-Play-v0
 - Isaac-Velocity-DwlBaseline-G1-v0
 - Isaac-Velocity-DwlBaseline-G1-Play-v0
+
+`Isaac-Velocity-DwlBaseline-*` is kept as a backwards-compatible alias for the stock proprioception baseline.
 
 ## Local Train/Play CLI
 
@@ -42,7 +52,37 @@ DWL full training run:
 Proprioception-only stock G1 PPO baseline without DWL-specific model, rewards, observations, domain randomization, or external height-scan policy input:
 
 ```bash
-./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DwlBaseline-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-StockProprio-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
+```
+
+DWL task with plain asymmetric PPO and no denoising decoder:
+
+```bash
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-PPO-NoDenoising-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
+```
+
+DWL task where the actor directly receives the terrain height scan:
+
+```bash
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-HeightScanActor-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
+```
+
+Oracle upper-bound task where the actor directly receives the privileged state:
+
+```bash
+./isaaclab.sh train --rl_library rsl_rl --task Isaac-Velocity-DWL-PrivilegedActor-G1-v0 --num_envs 4096 --max_iterations 3000 --headless
+```
+
+Run all four baselines sequentially:
+
+```bash
+./scripts/train_baselines.sh
+```
+
+Run one baseline through the helper script:
+
+```bash
+TASK=Isaac-Velocity-DWL-HeightScanActor-G1-v0 ./scripts/train_baseline.sh
 ```
 
 Full PhysX-style training:

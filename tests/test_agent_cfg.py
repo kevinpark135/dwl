@@ -7,7 +7,13 @@ import torch
 from isaaclab.utils.dict import class_to_dict
 from tensordict import TensorDict
 
-from agents.rsl_rl_ppo_cfg import G1DwlPPORunnerCfg, G1ProprioceptiveBaselinePPORunnerCfg
+from agents.rsl_rl_ppo_cfg import (
+    G1DwlHeightScanActorPPORunnerCfg,
+    G1DwlPPORunnerCfg,
+    G1DwlPpoNoDenoisingPPORunnerCfg,
+    G1DwlPrivilegedActorPPORunnerCfg,
+    G1ProprioceptiveBaselinePPORunnerCfg,
+)
 from rsl_rl.dwl_model import DwlActorModel, DwlCriticModel
 from rsl_rl.dwl_ppo import DwlPPO
 
@@ -66,6 +72,36 @@ def test_proprioceptive_baseline_agent_cfg_uses_stock_ppo_components():
 
     assert cfg.class_name == "OnPolicyRunner"
     assert cfg.experiment_name == "g1_proprio_baseline"
+    assert cfg.obs_groups == {"actor": ["policy"], "critic": ["policy"]}
     assert cfg.actor.class_name == "MLPModel"
     assert cfg.critic.class_name == "MLPModel"
+    assert cfg.algorithm.class_name == "PPO"
+
+
+def test_dwl_ppo_no_denoising_agent_cfg_uses_plain_asymmetric_ppo():
+    cfg = G1DwlPpoNoDenoisingPPORunnerCfg()
+
+    assert cfg.experiment_name == "g1_dwl_ppo_no_denoising"
+    assert cfg.obs_groups == {"actor": ["policy"], "critic": ["privileged"]}
+    assert cfg.actor.class_name == "MLPModel"
+    assert cfg.critic.class_name == "MLPModel"
+    assert cfg.algorithm.class_name == "PPO"
+    assert cfg.algorithm.value_loss_coef == 5.0
+    assert cfg.algorithm.learning_rate == 1.0e-5
+    assert cfg.algorithm.gamma == 0.995
+
+
+def test_height_scan_actor_agent_cfg_uses_dwl_plain_ppo_settings():
+    cfg = G1DwlHeightScanActorPPORunnerCfg()
+
+    assert cfg.experiment_name == "g1_dwl_height_scan_actor"
+    assert cfg.obs_groups == {"actor": ["policy"], "critic": ["privileged"]}
+    assert cfg.algorithm.class_name == "PPO"
+
+
+def test_privileged_actor_agent_cfg_uses_privileged_actor_and_critic_inputs():
+    cfg = G1DwlPrivilegedActorPPORunnerCfg()
+
+    assert cfg.experiment_name == "g1_dwl_privileged_actor"
+    assert cfg.obs_groups == {"actor": ["privileged"], "critic": ["privileged"]}
     assert cfg.algorithm.class_name == "PPO"

@@ -3,7 +3,13 @@
 
 from actions import DwlJointPositionActionCfg
 from curriculums import dwl_terrain_levels
-from baseline_env_cfg import G1ProprioceptiveBaselineEnvCfg, G1ProprioceptiveBaselineEnvCfg_PLAY
+from baseline_env_cfg import (
+    G1DwlHeightScanActorEnvCfg,
+    G1DwlPpoNoDenoisingEnvCfg,
+    G1DwlPrivilegedActorEnvCfg,
+    G1ProprioceptiveBaselineEnvCfg,
+    G1ProprioceptiveBaselineEnvCfg_PLAY,
+)
 from dwl_env_cfg import G1DwlEnvCfg, G1DwlEnvCfg_PLAY, YAW_CURRICULUM_STEPS
 from observations import CONTROLLED_LEG_JOINT_NAMES
 
@@ -129,7 +135,7 @@ def test_play_cfg_disables_policy_noise_and_push_wrenches():
 def test_proprioceptive_baseline_removes_external_height_scan_sensor():
     cfg = G1ProprioceptiveBaselineEnvCfg()
 
-    assert cfg.observations.policy.height_scan is None
+    assert getattr(cfg.observations.policy, "height_scan", None) is None
     assert cfg.scene.height_scanner is None
     assert cfg.rewards.track_lin_vel_xy_exp is not None
 
@@ -137,6 +143,33 @@ def test_proprioceptive_baseline_removes_external_height_scan_sensor():
 def test_proprioceptive_baseline_play_removes_external_height_scan_sensor():
     cfg = G1ProprioceptiveBaselineEnvCfg_PLAY()
 
-    assert cfg.observations.policy.height_scan is None
+    assert getattr(cfg.observations.policy, "height_scan", None) is None
     assert cfg.scene.height_scanner is None
     assert not cfg.observations.policy.enable_corruption
+
+
+def test_ppo_no_denoising_baseline_reuses_dwl_task_without_decoder_specific_env_changes():
+    cfg = G1DwlPpoNoDenoisingEnvCfg()
+
+    assert getattr(cfg.observations.policy, "height_scan", None) is None
+    assert cfg.observations.privileged.height_scan is not None
+    assert cfg.rewards.alive.weight == 0.05
+    assert cfg.rewards.track_lin_vel_xy_exp is None
+    assert cfg.events.init_dwl_buffers is not None
+
+
+def test_height_scan_actor_baseline_adds_height_scan_to_policy_observations():
+    cfg = G1DwlHeightScanActorEnvCfg()
+
+    assert cfg.observations.policy.height_scan is not None
+    assert cfg.observations.policy.height_scan.params["sensor_cfg"].name == "height_scanner"
+    assert cfg.observations.privileged.height_scan is not None
+    assert cfg.scene.height_scanner is not None
+
+
+def test_privileged_actor_baseline_keeps_privileged_state_available():
+    cfg = G1DwlPrivilegedActorEnvCfg()
+
+    assert getattr(cfg.observations.policy, "height_scan", None) is None
+    assert cfg.observations.privileged.base_lin_vel is not None
+    assert cfg.observations.privileged.height_scan is not None
