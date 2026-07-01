@@ -121,25 +121,3 @@ gym.register(
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:G1ProprioceptiveBaselinePPORunnerCfg",
     },
 )
-
-
-gym.register(
-    id="Isaac-Velocity-DwlBaseline-G1-v0",
-    entry_point="isaaclab.envs:ManagerBasedRLEnv",
-    disable_env_checker=True,
-    kwargs={
-        "env_cfg_entry_point": f"{__name__}.baseline_env_cfg:G1ProprioceptiveBaselineEnvCfg",
-        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:G1ProprioceptiveBaselinePPORunnerCfg",
-    },
-)
-
-
-gym.register(
-    id="Isaac-Velocity-DwlBaseline-G1-Play-v0",
-    entry_point="isaaclab.envs:ManagerBasedRLEnv",
-    disable_env_checker=True,
-    kwargs={
-        "env_cfg_entry_point": f"{__name__}.baseline_env_cfg:G1ProprioceptiveBaselineEnvCfg_PLAY",
-        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:G1ProprioceptiveBaselinePPORunnerCfg",
-    },
-)
