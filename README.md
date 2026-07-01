@@ -19,16 +19,19 @@ DWL task and environment configuration built for Isaac Lab. Copy this repository
 | `Isaac-Velocity-DWL-PrivilegedActor-G1-v0` | Oracle baseline where the actor receives privileged state. |
 | `Isaac-Velocity-DWL-PrivilegedActor-G1-Play-v0` | Play/evaluation task for the privileged actor baseline. |
 
-## Base Isaac Environment
+## System Environment
 
 | Item | Value |
 | --- | --- |
-| Isaac Lab checkout | `/home/kevinpark135/IsaacLab` |
+| OS/kernel | Ubuntu 24.04, Linux `6.17.0-35-generic` |
+| CPU | Intel Xeon Silver 4114 @ 2.20 GHz, 20 CPUs, 20 cores, 1 socket |
+| RAM | 62 GiB |
+| GPU | NVIDIA GeForce RTX 2080 Ti, 11264 MiB VRAM |
+| NVIDIA driver / CUDA | Driver `595.71.05`, CUDA `13.2` |
+| Isaac Lab checkout | `/home/kevinpark135/IsaacLab`, branch `release/3.0.0-beta2`, commit `d8ec040d8c` |
+| Isaac Lab version | `3.0.0` from `IsaacLab/VERSION`; Python package `isaaclab==6.1.6` |
+| Isaac Sim version | Python package `isaacsim==6.0.0.1` |
 | Task package path | `source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion/velocity/config/dwl` |
-| Parent environment config | `isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg:LocomotionVelocityRoughEnvCfg` |
-| Stock G1 reference config | `isaaclab_tasks.manager_based.locomotion.velocity.config.g1.rough_env_cfg:G1RoughEnvCfg` |
-| Robot asset | `isaaclab_assets:G1_MINIMAL_CFG` |
-| Gym entry point | `isaaclab.envs:ManagerBasedRLEnv` |
 | RL library | `rsl_rl` through Isaac Lab's train/play CLI |
 
 ## Local Train/Play CLI
